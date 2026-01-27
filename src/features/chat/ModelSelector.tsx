@@ -1,28 +1,22 @@
 /**
- * ModelSelector - 模型选择器组件
- * 
- * 特性：
- * - 完整的键盘导航（上下键、Enter、Escape）
- * - 按使用频率排序
- * - 搜索过滤
- * - 按 provider 分组显示
- * - 显示最近使用的模型
+ * ModelSelector - 高效模型选择器
+ * 风格：极简、开发者工具风格、高密度
+ * 适配：统一 Dropdown 体验，响应式宽度
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react'
-import { ChevronDownIcon, SearchIcon } from '../../components/Icons'
+import { ChevronDownIcon, SearchIcon, ThinkingIcon, EyeIcon } from '../../components/Icons'
 import type { ModelInfo } from '../../api'
 import {
   getModelKey,
   groupModelsByProvider,
   getRecentModels,
   recordModelUsage,
-  type ModelGroup,
 } from '../../utils/modelUtils'
 
 interface ModelSelectorProps {
   models: ModelInfo[]
-  selectedModelKey: string | null  // providerId:modelId 格式
+  selectedModelKey: string | null
   onSelect: (modelKey: string, model: ModelInfo) => void
   isLoading?: boolean
   disabled?: boolean
@@ -39,12 +33,11 @@ export const ModelSelector = memo(function ModelSelector({
   const [searchQuery, setSearchQuery] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   
+  const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  // 过滤模型
   const filteredModels = useMemo(() => {
     if (!searchQuery.trim()) return models
     const query = searchQuery.toLowerCase()
@@ -56,35 +49,47 @@ export const ModelSelector = memo(function ModelSelector({
     )
   }, [models, searchQuery])
 
-  // 分组模型（按使用频率排序）
-  const modelGroups = useMemo(() => 
-    groupModelsByProvider(filteredModels),
-    [filteredModels]
-  )
+  // 分组数据
+  const { flatList } = useMemo(() => {
+    const groups = groupModelsByProvider(filteredModels)
+    const recent = searchQuery ? [] : getRecentModels(models, 5)
+    
+    let flat: Array<{ type: 'header' | 'item', data: any, key: string }> = []
+    const addedKeys = new Set<string>()
+    
+    if (recent.length > 0) {
+      flat.push({ type: 'header', data: { name: 'Recent' }, key: 'header-recent' })
+      recent.forEach(m => {
+        const key = getModelKey(m)
+        flat.push({ type: 'item', data: m, key: `recent-${key}` })
+        addedKeys.add(key)
+      })
+    }
+    
+    groups.forEach(g => {
+      const groupModels = g.models.filter(m => !addedKeys.has(getModelKey(m)))
+      if (groupModels.length > 0) {
+        flat.push({ type: 'header', data: { name: g.providerName }, key: `header-${g.providerId}` })
+        groupModels.forEach(m => flat.push({ type: 'item', data: m, key: getModelKey(m) }))
+      }
+    })
+    
+    return { flatList: flat }
+  }, [filteredModels, models, searchQuery])
 
-  // 扁平化的模型列表（用于键盘导航）
-  const flatModels = useMemo(() => 
-    modelGroups.flatMap(g => g.models),
-    [modelGroups]
-  )
+  const itemIndices = useMemo(() => {
+    return flatList
+      .map((item, index) => item.type === 'item' ? index : -1)
+      .filter(i => i !== -1)
+  }, [flatList])
 
-  // 最近使用的模型
-  const recentModels = useMemo(() => 
-    searchQuery ? [] : getRecentModels(models, 3),
-    [models, searchQuery]
-  )
-
-  // 当前选中的模型
   const selectedModel = useMemo(() => {
     if (!selectedModelKey) return null
     return models.find(m => getModelKey(m) === selectedModelKey) ?? null
   }, [models, selectedModelKey])
 
-  // 显示名称
   const displayName = selectedModel?.name || (isLoading ? 'Loading...' : 'Select model')
-  const displayProvider = selectedModel?.providerName
 
-  // 打开菜单
   const openMenu = useCallback(() => {
     if (disabled || isLoading) return
     setIsOpen(true)
@@ -92,14 +97,12 @@ export const ModelSelector = memo(function ModelSelector({
     setHighlightedIndex(0)
   }, [disabled, isLoading])
 
-  // 关闭菜单
   const closeMenu = useCallback(() => {
     setIsOpen(false)
     setSearchQuery('')
     triggerRef.current?.focus()
   }, [])
 
-  // 选择模型
   const handleSelect = useCallback((model: ModelInfo) => {
     const key = getModelKey(model)
     recordModelUsage(model)
@@ -107,308 +110,172 @@ export const ModelSelector = memo(function ModelSelector({
     closeMenu()
   }, [onSelect, closeMenu])
 
-  // 聚焦搜索框
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => searchInputRef.current?.focus(), 10)
-    }
+    if (isOpen) setTimeout(() => searchInputRef.current?.focus(), 50)
   }, [isOpen])
 
-  // 点击外部关闭
   useEffect(() => {
     if (!isOpen) return
-    
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        !triggerRef.current?.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         closeMenu()
       }
     }
-    
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen, closeMenu])
 
-  // 滚动高亮项到可视区域
+  // 滚动逻辑
   useEffect(() => {
-    if (!isOpen || flatModels.length === 0) return
-    
-    const el = document.getElementById(`model-item-${highlightedIndex}`)
+    if (!isOpen) return
+    const globalIndex = itemIndices[highlightedIndex]
+    const el = document.getElementById(`list-item-${globalIndex}`)
     el?.scrollIntoView({ block: 'nearest' })
-  }, [highlightedIndex, isOpen, flatModels.length])
+  }, [highlightedIndex, isOpen, itemIndices])
 
-  // 键盘导航
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setHighlightedIndex(prev => 
-          Math.min(prev + 1, flatModels.length - 1)
-        )
+        setHighlightedIndex(prev => Math.min(prev + 1, itemIndices.length - 1))
         break
-        
       case 'ArrowUp':
         e.preventDefault()
         setHighlightedIndex(prev => Math.max(prev - 1, 0))
         break
-        
       case 'Enter':
         e.preventDefault()
-        if (flatModels[highlightedIndex]) {
-          handleSelect(flatModels[highlightedIndex])
+        const globalIndex = itemIndices[highlightedIndex]
+        const item = flatList[globalIndex]
+        if (item && item.type === 'item') {
+          handleSelect(item.data)
         }
         break
-        
       case 'Escape':
         e.preventDefault()
         closeMenu()
         break
-        
-      case 'Tab':
-        // 允许 Tab 关闭菜单
-        closeMenu()
-        break
     }
-  }, [flatModels, highlightedIndex, handleSelect, closeMenu])
-
-  // Trigger 键盘事件
-  const handleTriggerKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
-      e.preventDefault()
-      openMenu()
-    }
-  }, [openMenu])
+  }, [itemIndices, flatList, highlightedIndex, handleSelect, closeMenu])
 
   return (
-    <div className="relative">
-      {/* Trigger Button */}
+    <div ref={containerRef} className="relative font-sans">
       <button
         ref={triggerRef}
         onClick={() => isOpen ? closeMenu() : openMenu()}
-        onKeyDown={handleTriggerKeyDown}
         disabled={disabled || isLoading}
-        className="flex items-center gap-1.5 px-2 py-1.5 text-text-200 rounded-lg transition-all duration-150 hover:bg-bg-200/50 hover:text-text-100 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        aria-label="Model selector"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
+        className="group flex items-center gap-2 px-2 py-1.5 text-text-200 rounded-md hover:bg-bg-200/50 hover:text-text-100 transition-colors cursor-pointer text-sm"
+        title={displayName}
       >
-        <div className="flex flex-col items-start">
-          <span className="font-medium text-sm leading-tight">{displayName}</span>
-          {displayProvider && (
-            <span className="text-[10px] text-text-400 leading-tight">{displayProvider}</span>
-          )}
-        </div>
-        <div className={`opacity-60 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-          <ChevronDownIcon size={14} />
+        <span className="font-medium truncate max-w-[240px]">{displayName}</span>
+        <div className={`opacity-50 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+          <ChevronDownIcon size={10} />
         </div>
       </button>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div
-          ref={menuRef}
-          className="absolute top-full left-0 mt-1 w-[340px] bg-bg-000 border border-border-200 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-          role="listbox"
-          onKeyDown={handleKeyDown}
-        >
-          {/* Search Input */}
-          <div className="p-2 border-b border-border-200/50">
-            <div className="relative">
-              <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  setHighlightedIndex(0)
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Search models..."
-                className="w-full bg-bg-200 border border-border-200/50 rounded-lg py-2 pl-9 pr-3 text-sm text-text-100 placeholder:text-text-400 focus:outline-none focus:border-accent-main-100/50 transition-colors"
-                aria-label="Search models"
-              />
-            </div>
+      <div 
+        className={`absolute top-full left-0 mt-1 w-[85vw] sm:w-[380px] z-50 transition-all duration-200 ease-out origin-top-left ${
+          isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-1 pointer-events-none'
+        }`}
+        onKeyDown={handleKeyDown}
+      >
+        <div className="bg-bg-000 border border-border-200 shadow-xl rounded-lg overflow-hidden flex flex-col max-h-[600px]">
+          {/* Search */}
+          <div className="flex items-center px-3 py-2.5 border-b border-border-200/50 flex-shrink-0 bg-bg-000 z-20">
+            <SearchIcon className="w-3.5 h-3.5 text-text-400 mr-2" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setHighlightedIndex(0)
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Search model..."
+              className="flex-1 bg-transparent border-none outline-none text-sm text-text-100 placeholder:text-text-400 font-medium"
+            />
           </div>
 
-          {/* Model List */}
-          <div ref={listRef} className="max-h-[400px] overflow-y-auto custom-scrollbar">
-            {/* Recent Models Section */}
-            {recentModels.length > 0 && (
-              <div className="border-b border-border-200/30">
-                <div className="px-3 py-1.5 text-[10px] font-bold text-text-400 uppercase tracking-wider">
-                  Recent
-                </div>
-                {recentModels.map((model) => {
-                  const key = getModelKey(model)
-                  const globalIndex = flatModels.findIndex(m => getModelKey(m) === key)
+          {/* List */}
+          <div ref={listRef} className="overflow-y-auto custom-scrollbar flex-1 relative">
+            {flatList.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-text-400">No models found</div>
+            ) : (
+              <div className="pb-1">
+                {flatList.map((item, index) => {
+                  if (item.type === 'header') {
+                    return (
+                      <div key={item.key} className="px-3 py-1.5 mt-1 first:mt-0 text-[10px] font-bold text-text-400 uppercase tracking-wider select-none sticky top-0 bg-bg-000/95 backdrop-blur-md z-10 border-b border-border-100/50 shadow-sm">
+                        {item.data.name}
+                      </div>
+                    )
+                  }
+                  
+                  const model = item.data as ModelInfo
+                  const itemKey = getModelKey(model)
+                  const isSelected = selectedModelKey === itemKey
+                  const isCurrentlyHighlighted = itemIndices[highlightedIndex] === index
+
                   return (
-                    <ModelItem
-                      key={`recent-${key}`}
-                      model={model}
-                      isSelected={selectedModelKey === key}
-                      isHighlighted={highlightedIndex === globalIndex}
-                      onClick={() => handleSelect(model)}
-                      onMouseEnter={() => setHighlightedIndex(globalIndex)}
-                      id={`model-item-${globalIndex}`}
-                    />
+                    <div key={item.key} className="px-1.5">
+                      <div
+                        id={`list-item-${index}`}
+                        onClick={() => handleSelect(model)}
+                        onMouseEnter={() => {
+                          const hIndex = itemIndices.indexOf(index)
+                          if (hIndex !== -1) setHighlightedIndex(hIndex)
+                        }}
+                        className={`
+                          group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer text-sm font-sans transition-colors mt-0.5
+                          ${isSelected ? 'bg-accent-main-100/10 text-accent-main-100' : 'text-text-200'}
+                          ${isCurrentlyHighlighted && !isSelected ? 'bg-bg-200/60 text-text-100' : ''}
+                        `}
+                      >
+                        {/* Left: Name */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                          <span className={`truncate font-medium ${isSelected ? 'text-accent-main-100' : 'text-text-100'}`}>
+                            {model.name}
+                          </span>
+                          <div className="flex items-center gap-1.5 opacity-30 group-hover:opacity-60 transition-opacity flex-shrink-0 h-4">
+                            {model.supportsReasoning && (
+                              <div className="flex items-center justify-center w-3.5" title="Thinking">
+                                <ThinkingIcon size={13} />
+                              </div>
+                            )}
+                            {model.supportsImages && (
+                              <div className="flex items-center justify-center w-3.5" title="Vision">
+                                <EyeIcon size={14} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Meta Info */}
+                        <div className="flex items-center gap-3 text-xs text-text-400 font-mono flex-shrink-0 ml-4">
+                          <span className="opacity-40 max-w-[100px] truncate text-right hidden sm:block">
+                            {model.providerName}
+                          </span>
+                          <span className="opacity-40 w-[4ch] text-right">
+                            {formatContext(model.contextLimit)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
             )}
-
-            {/* Grouped Models */}
-            {modelGroups.map((group) => (
-              <ModelGroupSection
-                key={group.providerId}
-                group={group}
-                selectedModelKey={selectedModelKey}
-                highlightedIndex={highlightedIndex}
-                flatModels={flatModels}
-                onSelect={handleSelect}
-                onHighlight={setHighlightedIndex}
-              />
-            ))}
-
-            {/* Empty State */}
-            {flatModels.length === 0 && (
-              <div className="px-3 py-8 text-sm text-text-400 text-center">
-                {isLoading ? 'Loading models...' : searchQuery ? 'No models found' : 'No models available'}
-              </div>
-            )}
           </div>
-
-          {/* Footer hint */}
-          <div className="px-3 py-2 border-t border-border-200/30 bg-bg-100/50">
-            <div className="flex items-center justify-between text-[10px] text-text-400">
-              <span>↑↓ Navigate</span>
-              <span>↵ Select</span>
-              <span>Esc Close</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-})
-
-// ============================================
-// Sub-components
-// ============================================
-
-interface ModelGroupSectionProps {
-  group: ModelGroup
-  selectedModelKey: string | null
-  highlightedIndex: number
-  flatModels: ModelInfo[]
-  onSelect: (model: ModelInfo) => void
-  onHighlight: (index: number) => void
-}
-
-const ModelGroupSection = memo(function ModelGroupSection({
-  group,
-  selectedModelKey,
-  highlightedIndex,
-  flatModels,
-  onSelect,
-  onHighlight,
-}: ModelGroupSectionProps) {
-  return (
-    <div>
-      <div className="px-3 py-1.5 text-[10px] font-bold text-text-400 uppercase tracking-wider sticky top-0 bg-bg-000/95 backdrop-blur-sm z-10">
-        {group.providerName}
-      </div>
-      {group.models.map((model) => {
-        const key = getModelKey(model)
-        const globalIndex = flatModels.findIndex(m => getModelKey(m) === key)
-        return (
-          <ModelItem
-            key={key}
-            model={model}
-            isSelected={selectedModelKey === key}
-            isHighlighted={highlightedIndex === globalIndex}
-            onClick={() => onSelect(model)}
-            onMouseEnter={() => onHighlight(globalIndex)}
-            id={`model-item-${globalIndex}`}
-          />
-        )
-      })}
-    </div>
-  )
-})
-
-interface ModelItemProps {
-  model: ModelInfo
-  isSelected: boolean
-  isHighlighted: boolean
-  onClick: () => void
-  onMouseEnter: () => void
-  id: string
-}
-
-const ModelItem = memo(function ModelItem({
-  model,
-  isSelected,
-  isHighlighted,
-  onClick,
-  onMouseEnter,
-  id,
-}: ModelItemProps) {
-  return (
-    <div
-      id={id}
-      role="option"
-      aria-selected={isSelected}
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      className={`
-        flex items-center justify-between px-3 py-2 cursor-pointer transition-colors
-        ${isHighlighted ? 'bg-bg-200' : 'hover:bg-bg-100'}
-        ${isSelected ? 'text-accent-main-100' : 'text-text-200'}
-      `}
-    >
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium truncate ${isSelected ? 'text-accent-main-100' : 'text-text-100'}`}>
-            {model.name}
-          </span>
-          {isSelected && (
-            <CheckIcon className="w-4 h-4 text-accent-main-100 flex-shrink-0" />
-          )}
-        </div>
-        <div className="text-[11px] text-text-400 truncate">
-          {formatModelDescription(model)}
         </div>
       </div>
     </div>
   )
 })
 
-// ============================================
-// Helpers
-// ============================================
-
-function formatModelDescription(model: ModelInfo): string {
-  const parts: string[] = []
-  
-  // Context limit
-  const contextK = Math.round(model.contextLimit / 1000)
-  parts.push(`${contextK}K context`)
-  
-  // Capabilities
-  if (model.supportsReasoning) parts.push('reasoning')
-  if (model.supportsImages) parts.push('vision')
-  
-  return parts.join(' · ')
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  )
+function formatContext(limit: number): string {
+  if (!limit) return ''
+  const k = Math.round(limit / 1000)
+  if (k >= 1000) return `${(k/1000).toFixed(0)}M`
+  return `${k}k`
 }
