@@ -211,7 +211,7 @@ export const ModelSelector = memo(function ModelSelector({
         ref={triggerRef}
         onClick={() => isOpen ? closeMenu() : openMenu()}
         disabled={disabled || isLoading}
-        className="group flex items-center gap-2 px-2 py-1.5 text-text-200 rounded-md hover:bg-bg-200/50 hover:text-text-100 transition-colors cursor-pointer text-sm"
+        className="group flex items-center gap-2 px-2 py-1.5 text-text-200 rounded-lg hover:bg-bg-200/50 hover:text-text-100 transition-colors cursor-pointer text-sm"
         title={displayName}
       >
         <span className="font-medium truncate max-w-[240px]">{displayName}</span>

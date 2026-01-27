@@ -58,10 +58,9 @@ export function Header({
         <IconButton
           aria-label="Toggle sidebar"
           onClick={onToggleSidebar}
-          size="sm"
-          className="hover:bg-bg-200/50"
+          className="hover:bg-bg-200/50 text-text-400 hover:text-text-100"
         >
-          <SidebarIcon />
+          <SidebarIcon size={18} />
         </IconButton>
 
         {/* Model Selector */}
@@ -73,16 +72,15 @@ export function Header({
         />
       </div>
 
-      <div className="flex items-center gap-1 pointer-events-auto">
+      <div className="flex items-center gap-2 pointer-events-auto">
         {/* Wide Mode Toggle */}
         {onToggleWideMode && (
           <IconButton
             aria-label={isWideMode ? "Standard width" : "Wide mode"}
             onClick={onToggleWideMode}
-            size="sm"
             className="hover:bg-bg-200/50 hidden sm:flex text-text-400 hover:text-text-100"
           >
-            {isWideMode ? <MinimizeIcon /> : <MaximizeIcon />}
+            {isWideMode ? <MinimizeIcon size={18} /> : <MaximizeIcon size={18} />}
           </IconButton>
         )}
 
@@ -90,8 +88,7 @@ export function Header({
         <IconButton
           aria-label="New chat"
           onClick={onNewChat}
-          size="sm"
-          className="hover:bg-bg-200/50"
+          className="hover:bg-bg-200/50 text-text-400 hover:text-text-100"
         >
           <ComposeIcon size={18} />
         </IconButton>
@@ -102,10 +99,9 @@ export function Header({
             ref={settingsTriggerRef}
             aria-label="Menu"
             onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
-            size="sm"
-            className="hover:bg-bg-200/50"
+            className="hover:bg-bg-200/50 text-text-400 hover:text-text-100"
           >
-            <MoreHorizontalIcon size={20} />
+            <MoreHorizontalIcon size={18} />
           </IconButton>
 
           {/* Settings Menu */}
