@@ -549,7 +549,7 @@ class MessageStore {
 
   private extractUserText(message: Message): string {
     return message.parts
-      .filter((p): p is Part & { type: 'text' } => p.type === 'text')
+      .filter((p): p is Part & { type: 'text' } => p.type === 'text' && !p.synthetic)
       .map(p => p.text)
       .join('\n')
   }
