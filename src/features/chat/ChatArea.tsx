@@ -2,7 +2,7 @@
 // ChatArea - 聊天消息显示区域
 // ============================================
 
-import { useRef, useImperativeHandle, forwardRef, useState, memo, useCallback } from 'react'
+import { useRef, useImperativeHandle, forwardRef, useState, memo, useCallback, useEffect } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { MessageRenderer } from '../message'
 import type { Message } from '../../types/message'
@@ -11,6 +11,8 @@ interface ChatAreaProps {
   messages: Message[]
   /** 当前 session ID，用于检测 session 切换并触发过渡动画 */
   sessionId?: string | null
+  /** 是否正在 streaming，用于定时自动滚动 */
+  isStreaming?: boolean
   /** 累计向前加载的消息数量，用于计算 Virtuoso 的 firstItemIndex */
   prependedCount?: number
   onLoadMore?: () => void
@@ -56,6 +58,7 @@ const START_INDEX = 1000000
 export const ChatArea = memo(forwardRef<ChatAreaHandle, ChatAreaProps>(({ 
   messages, 
   sessionId,
+  isStreaming = false,
   prependedCount = 0,
   onLoadMore,
   onUndo,
@@ -81,9 +84,29 @@ export const ChatArea = memo(forwardRef<ChatAreaHandle, ChatAreaProps>(({
   // 过滤空消息
   const visibleMessages = messages.filter(messageHasContent)
   
-  // 用 ref 追踪最新的消息数量，确保 useImperativeHandle 中能获取到
+  // 用 ref 追踪最新的消息数量，确保回调和 effect 中能获取到
   const visibleMessagesCountRef = useRef(visibleMessages.length)
   visibleMessagesCountRef.current = visibleMessages.length
+  
+  // 定时自动滚动：在 streaming 时定期检查是否需要滚动
+  // 这样打字机效果导致的内容增长也会触发滚动
+  useEffect(() => {
+    if (!isStreaming) return
+    
+    const scrollInterval = setInterval(() => {
+      // 用户正在滚动、被禁用、或不在底部时，不自动滚动
+      if (isUserScrollingRef.current || suppressScrollRef.current || !isUserAtBottomRef.current) {
+        return
+      }
+      virtuosoRef.current?.scrollToIndex({ 
+        index: visibleMessagesCountRef.current - 1, 
+        align: 'end', 
+        behavior: 'auto' 
+      })
+    }, 100)  // 每 100ms 检查一次
+    
+    return () => clearInterval(scrollInterval)
+  }, [isStreaming])
   
   // firstItemIndex：基于 prependedCount 计算，确保和 messages 同步
   const firstItemIndex = START_INDEX - prependedCount

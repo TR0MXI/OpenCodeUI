@@ -74,11 +74,12 @@ export const ReasoningPartView = memo(function ReasoningPartView({ part, isStrea
   }, [isPartStreaming, hasContent])
 
   // 滚动 ScrollArea 内部到底部
+  // 使用 displayText 而不是 part.text，这样打字机效果时也会滚动
   useEffect(() => {
     if (isPartStreaming && expanded && scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
     }
-  }, [part.text, isPartStreaming, expanded])
+  }, [displayText, isPartStreaming, expanded])
 
   return (
     <div className={`border border-border-300/20 rounded-xl overflow-hidden transition-all duration-300 ease-out -ml-3 ${

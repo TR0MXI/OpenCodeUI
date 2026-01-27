@@ -426,6 +426,7 @@ function App() {
                 ref={chatAreaRef} 
                 messages={messages}
                 sessionId={routeSessionId}
+                isStreaming={isStreaming}
                 prependedCount={prependedCount}
                 onLoadMore={loadMoreHistory}
                 onUndo={handleUndoWithAnimation}
