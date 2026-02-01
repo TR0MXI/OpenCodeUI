@@ -1,6 +1,7 @@
 import type { ApiPermissionRequest, PermissionReply } from '../../api'
-import { PermissionListIcon, GlobeIcon, UsersIcon, ReturnIcon } from '../../components/Icons'
+import { PermissionListIcon, UsersIcon, ReturnIcon } from '../../components/Icons'
 import { DiffView } from '../../components/DiffView'
+import { ContentBlock } from '../../components'
 import { childSessionStore } from '../../store'
 
 interface PermissionDialogProps {
@@ -87,36 +88,24 @@ export function PermissionDialog({ request, onReply, queueLength = 1, isReplying
 
               {/* Patterns */}
               {request.patterns && request.patterns.length > 0 && (
-                <div>
-                  <p className="text-xs text-text-400 mb-2">Patterns to allow</p>
-                  <div className="space-y-1.5">
-                    {request.patterns.map((pattern, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-text-400">
-                          <GlobeIcon />
-                        </span>
-                        <span className="text-sm text-text-100 font-mono">{pattern}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <ContentBlock
+                  label="Requesting"
+                  content={request.patterns.map(p => p.replace(/\\n/g, '\n')).join('\n\n')}
+                  language="bash"
+                  maxHeight={200}
+                  collapsible={false}
+                />
               )}
 
               {/* Already allowed */}
               {request.always && request.always.length > 0 && (
-                <div>
-                  <p className="text-xs text-text-400 mb-2">Already allowed</p>
-                  <div className="space-y-1.5">
-                    {request.always.map((pattern, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <span className="flex-shrink-0 w-5 h-5 rounded-full border border-border-300/50 flex items-center justify-center text-[10px] text-text-400 mt-0.5">
-                          ✓
-                        </span>
-                        <span className="text-sm text-text-300 font-mono">{pattern}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <ContentBlock
+                  label="Allowed"
+                  content={request.always.join('\n')}
+                  language="bash"
+                  maxHeight={80}
+                  collapsible={false}
+                />
               )}
             </div>
 
