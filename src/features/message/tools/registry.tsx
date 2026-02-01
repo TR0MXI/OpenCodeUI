@@ -226,6 +226,18 @@ export const toolRegistry: ToolRegistry = [
     extractData: bashExtractData,
   },
   
+  // Todo (must be before write/read to avoid TodoWrite matching "write")
+  {
+    match: includes('todo'),
+    icon: <ChecklistIcon />,
+  },
+  
+  // Task (子 agent)
+  {
+    match: exact('task'),
+    icon: <TaskIcon />,
+  },
+  
   // Read file
   {
     match: includes('read', 'cat'),
@@ -263,20 +275,6 @@ export const toolRegistry: ToolRegistry = [
   {
     match: includes('think', 'reason', 'plan'),
     icon: <BrainIcon />,
-  },
-  
-  // Todo
-  {
-    match: includes('todo'),
-    icon: <ChecklistIcon />,
-    // renderer 将在 renderers/ 目录下定义
-  },
-  
-  // Task (子 agent)
-  {
-    match: exact('task'),
-    icon: <TaskIcon />,
-    // renderer 将在 renderers/ 目录下定义
   },
   
   // Question
