@@ -77,9 +77,8 @@ class LayoutStore {
   private subscribers = new Set<Subscriber>()
 
   constructor() {
-    // 从 localStorage 恢复状态
+    // 从 localStorage 恢复尺寸
     try {
-      // 恢复面板尺寸
       const savedWidth = localStorage.getItem('opencode-right-panel-width')
       if (savedWidth) {
         const width = parseInt(savedWidth)
@@ -94,45 +93,6 @@ class LayoutStore {
           this.state.bottomPanelHeight = height
         }
       }
-      
-      // 恢复 tabs（只恢复非 terminal 的 tabs）
-      const savedTabs = localStorage.getItem('opencode-panel-tabs')
-      if (savedTabs) {
-        const tabs = JSON.parse(savedTabs) as PanelTab[]
-        // 验证并过滤有效 tabs
-        const validTabs = tabs.filter(t => 
-          (t.type === 'files' || t.type === 'changes') &&
-          (t.position === 'bottom' || t.position === 'right') &&
-          typeof t.id === 'string'
-        )
-        if (validTabs.length > 0) {
-          this.state.panelTabs = validTabs
-        }
-      }
-      
-      // 恢复活动 tab IDs
-      const savedActiveIds = localStorage.getItem('opencode-active-tabs')
-      if (savedActiveIds) {
-        const activeIds = JSON.parse(savedActiveIds) as { bottom: string | null, right: string | null }
-        // 验证 active tab 存在于对应位置
-        if (activeIds.right && this.state.panelTabs.some(t => t.id === activeIds.right && t.position === 'right')) {
-          this.state.activeTabId.right = activeIds.right
-        }
-        if (activeIds.bottom && this.state.panelTabs.some(t => t.id === activeIds.bottom && t.position === 'bottom')) {
-          this.state.activeTabId.bottom = activeIds.bottom
-        }
-      }
-    } catch {
-      // ignore - use defaults
-    }
-  }
-  
-  // 保存 tabs 到 localStorage（不包括 terminal）
-  private persistTabs() {
-    try {
-      const nonTerminalTabs = this.state.panelTabs.filter(t => t.type !== 'terminal')
-      localStorage.setItem('opencode-panel-tabs', JSON.stringify(nonTerminalTabs))
-      localStorage.setItem('opencode-active-tabs', JSON.stringify(this.state.activeTabId))
     } catch {
       // ignore
     }
@@ -172,7 +132,6 @@ class LayoutStore {
     const tab = this.state.panelTabs.find(t => t.id === tabId && t.position === position)
     if (tab) {
       this.state.activeTabId[position] = tabId
-      this.persistTabs()
       this.notify()
     }
   }
@@ -190,10 +149,6 @@ class LayoutStore {
       } else {
         this.state.rightPanelOpen = true
       }
-    }
-    // 只持久化非 terminal 的 tabs
-    if (tab.type !== 'terminal') {
-      this.persistTabs()
     }
     this.notify()
     return id
@@ -246,7 +201,6 @@ class LayoutStore {
 
     const tab = this.state.panelTabs[index]
     const position = tab.position
-    const wasNonTerminal = tab.type !== 'terminal'
     this.state.panelTabs.splice(index, 1)
 
     // 如果关闭的是当前活动 tab，切换到同位置的相邻 tab
@@ -265,10 +219,6 @@ class LayoutStore {
       }
     }
 
-    // 只持久化非 terminal 的变更
-    if (wasNonTerminal) {
-      this.persistTabs()
-    }
     this.notify()
   }
 
@@ -287,7 +237,6 @@ class LayoutStore {
     if (!tab || tab.position === toPosition) return
 
     const fromPosition = tab.position
-    const isNonTerminal = tab.type !== 'terminal'
     
     // 更新位置
     tab.position = toPosition
@@ -318,9 +267,6 @@ class LayoutStore {
       }
     }
 
-    if (isNonTerminal) {
-      this.persistTabs()
-    }
     this.notify()
   }
 
@@ -337,10 +283,6 @@ class LayoutStore {
     const [draggedTab] = tabs.splice(draggedIndex, 1)
     tabs.splice(targetIndex, 0, draggedTab)
     
-    // 持久化（检查是否涉及非 terminal tabs）
-    if (draggedTab.type !== 'terminal') {
-      this.persistTabs()
-    }
     this.notify()
   }
 
