@@ -6,8 +6,11 @@ import { SettingsDialog } from '../settings/SettingsDialog'
 import { ShareDialog } from './ShareDialog'
 import { useMessageStore } from '../../store'
 import { useLayoutStore, layoutStore } from '../../store/layoutStore'
-import { useSessionStats, formatTokens, formatCost, useSessions } from '../../hooks'
-import type { ThemeMode } from '../../hooks'
+import { useSessionStats, formatTokens, formatCost } from '../../hooks'
+import { useSessionContext } from '../../contexts/SessionContext'
+import { updateSession } from '../../api'
+import { uiErrorHandler } from '../../utils'
+import type { ThemeMode, SessionStats } from '../../hooks'
 import type { ModelInfo } from '../../api'
 
 interface HeaderProps {
@@ -37,11 +40,15 @@ export function Header({
 }: HeaderProps) {
   const { shareUrl, messages, sessionId } = useMessageStore()
   const { rightPanelOpen, bottomPanelOpen } = useLayoutStore()
-  const { sessions } = useSessions()
+  const { sessions, refresh } = useSessionContext()
   
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
   
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
@@ -52,6 +59,39 @@ export function Header({
     [sessions, sessionId]
   )
   const sessionTitle = currentSession?.title || 'New Chat'
+
+  useEffect(() => {
+    setIsEditingTitle(false)
+  }, [sessionId])
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
+
+  const handleStartEdit = () => {
+    if (!sessionId) return
+    setEditTitle(sessionTitle)
+    setIsEditingTitle(true)
+  }
+
+  const handleRename = async () => {
+    if (!sessionId || !editTitle.trim() || editTitle === sessionTitle) {
+      setIsEditingTitle(false)
+      return
+    }
+    
+    try {
+      await updateSession(sessionId, { title: editTitle.trim() }, currentSession?.directory)
+      refresh()
+    } catch (e) {
+      uiErrorHandler('rename session', e)
+    } finally {
+      setIsEditingTitle(false)
+    }
+  }
 
   // 获取当前选中的模型
   const selectedModel = useMemo(() => {
@@ -114,20 +154,42 @@ export function Header({
 
       {/* Center: Session Title - Only on desktop */}
       <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex">
-        <div className="flex items-center group bg-transparent hover:bg-bg-200/50 rounded-lg transition-colors duration-300 ease-[cubic-bezier(0.165,0.85,0.45,1)] p-0.5 border border-transparent hover:border-border-200/50">
-          <button 
-            className="px-3 py-1.5 text-sm font-medium text-text-200 hover:text-text-100 transition-colors truncate max-w-[200px] lg:max-w-[300px] text-left cursor-default select-none"
-            title={sessionTitle}
-          >
-            {sessionTitle}
-          </button>
-          <div className="w-[1.5px] h-3 bg-border-200/50 mx-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <button 
-            className="p-1 text-text-400 hover:text-text-100 transition-colors rounded-md hover:bg-bg-300/50 opacity-0 group-hover:opacity-100 shrink-0"
-            title="Session options"
-          >
-            <ChevronDownIcon size={12} />
-          </button>
+        <div className={`flex items-center group ${isEditingTitle ? 'bg-bg-200/50 ring-1 ring-accent-main-100' : 'bg-transparent hover:bg-bg-200/50 border border-transparent hover:border-border-200/50'} rounded-lg transition-all duration-200 p-0.5 min-w-0 shrink`}>
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename()
+                if (e.key === 'Escape') setIsEditingTitle(false)
+              }}
+              className="px-3 py-1.5 text-sm font-medium text-text-100 bg-transparent border-none outline-none w-[200px] lg:w-[300px] h-full"
+            />
+          ) : (
+            <button 
+              onClick={handleStartEdit}
+              className="px-3 py-1.5 text-sm font-medium text-text-200 hover:text-text-100 transition-colors truncate max-w-[200px] lg:max-w-[300px] text-left cursor-text select-none"
+              title="Click to rename"
+            >
+              {sessionTitle}
+            </button>
+          )}
+
+          {!isEditingTitle && (
+            <>
+              <div className="w-[1.5px] h-3 bg-border-200/50 mx-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <button 
+                className="p-1 text-text-400 hover:text-text-100 transition-colors rounded-md hover:bg-bg-300/50 opacity-0 group-hover:opacity-100 shrink-0"
+                title="Share session"
+                onClick={() => setShareDialogOpen(true)}
+              >
+                <ChevronDownIcon size={12} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -284,8 +346,6 @@ export function Header({
 // ============================================
 // Context Indicator Component
 // ============================================
-
-import type { SessionStats } from '../../hooks'
 
 interface ContextIndicatorProps {
   stats: SessionStats
