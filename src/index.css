@@ -663,58 +663,13 @@ textarea.custom-scrollbar::-webkit-scrollbar-thumb {
 }
 
 /* Mobile Drawer Animations */
-@keyframes slide-in-right {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-@keyframes slide-out-right {
-  from { transform: translateX(0); }
-  to { transform: translateX(100%); }
-}
-
-@keyframes slide-in-bottom {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-@keyframes slide-out-bottom {
-  from { transform: translateY(0); }
-  to { transform: translateY(100%); }
-}
-
 @keyframes fade-in-overlay {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes fade-out-overlay {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-slide-out-right {
-  animation: slide-out-right 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-slide-in-bottom {
-  animation: slide-in-bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-slide-out-bottom {
-  animation: slide-out-bottom 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 .animate-fade-in-overlay {
   animation: fade-in-overlay 0.3s ease-out forwards;
-}
-
-.animate-fade-out-overlay {
-  animation: fade-out-overlay 0.2s ease-out forwards;
 }
 
 /* Mobile responsive utilities */
