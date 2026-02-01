@@ -1,9 +1,10 @@
 // ============================================
 // FileExplorer - 文件浏览器组件
 // 包含文件树和文件预览两个区域，支持拖拽调整高度
+// 性能优化：使用 CSS 变量 + requestAnimationFrame 处理 resize
 // ============================================
 
-import { memo, useCallback, useMemo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useMemo, useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { useFileExplorer, type FileTreeNode } from '../hooks'
 import { layoutStore, type PreviewFile } from '../store/layoutStore'
 import { 
@@ -29,15 +30,25 @@ const OVERSCAN = 5 // 额外渲染的行数
 interface FileExplorerProps {
   directory?: string
   previewFile: PreviewFile | null
+  position?: 'bottom' | 'right'
+  isPanelResizing?: boolean
 }
 
 export const FileExplorer = memo(function FileExplorer({ 
   directory, 
-  previewFile 
+  previewFile,
+  position = 'right',
+  isPanelResizing = false,
 }: FileExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const treeRef = useRef<HTMLDivElement>(null)
   const [treeHeight, setTreeHeight] = useState<number | null>(null) // null 表示自动
   const [isResizing, setIsResizing] = useState(false)
+  const rafRef = useRef<number>(0)
+  const currentHeightRef = useRef<number | null>(null)
+  
+  // 综合 resize 状态 - 外部面板 resize 或内部 resize
+  const isAnyResizing = isPanelResizing || isResizing
   
   const {
     tree,
@@ -56,6 +67,14 @@ export const FileExplorer = memo(function FileExplorer({
     refresh,
   } = useFileExplorer({ directory, autoLoad: true })
 
+  // 同步高度到 CSS 变量
+  useLayoutEffect(() => {
+    if (!isResizing && treeRef.current && treeHeight !== null) {
+      treeRef.current.style.setProperty('--tree-height', `${treeHeight}px`)
+      currentHeightRef.current = treeHeight
+    }
+  }, [treeHeight, isResizing])
+
   // 当 previewFile 改变时加载预览
   useEffect(() => {
     if (previewFile) {
@@ -71,49 +90,70 @@ export const FileExplorer = memo(function FileExplorer({
     } else {
       selectFile(node.path)
       loadPreview(node.path)
-      layoutStore.openFilePreview({ path: node.path, name: node.name })
+      layoutStore.openFilePreview({ path: node.path, name: node.name }, position)
     }
-  }, [toggleExpand, selectFile, loadPreview])
+  }, [toggleExpand, selectFile, loadPreview, position])
 
   // 关闭预览
   const handleClosePreview = useCallback(() => {
     clearPreview()
     layoutStore.closeFilePreview()
-    setTreeHeight(null) // 重置高度
+    setTreeHeight(null)
+    currentHeightRef.current = null
   }, [clearPreview])
 
-  // 拖拽调整高度
+  // 拖拽调整高度 - 使用 CSS 变量 + requestAnimationFrame 优化
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    setIsResizing(true)
     
     const container = containerRef.current
-    if (!container) return
+    const treeEl = treeRef.current
+    if (!container || !treeEl) return
+    
+    setIsResizing(true)
     
     const containerRect = container.getBoundingClientRect()
     const startY = e.clientY
-    const startHeight = treeHeight ?? containerRect.height * 0.4
+    const startHeight = currentHeightRef.current ?? containerRect.height * 0.4
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaY = moveEvent.clientY - startY
-      const newHeight = startHeight + deltaY
-      const maxHeight = containerRect.height - MIN_PREVIEW_HEIGHT
-      setTreeHeight(Math.min(Math.max(newHeight, MIN_TREE_HEIGHT), maxHeight))
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+      }
+      
+      rafRef.current = requestAnimationFrame(() => {
+        const deltaY = moveEvent.clientY - startY
+        const newHeight = startHeight + deltaY
+        const maxHeight = containerRect.height - MIN_PREVIEW_HEIGHT
+        const clampedHeight = Math.min(Math.max(newHeight, MIN_TREE_HEIGHT), maxHeight)
+        // 直接修改 CSS 变量
+        treeEl.style.setProperty('--tree-height', `${clampedHeight}px`)
+        currentHeightRef.current = clampedHeight
+      })
     }
     
     const handleMouseUp = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+      }
+      
       setIsResizing(false)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      
+      // 更新 state 以持久化
+      if (currentHeightRef.current !== null) {
+        setTreeHeight(currentHeightRef.current)
+      }
     }
     
     document.body.style.cursor = 'row-resize'
     document.body.style.userSelect = 'none'
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
-  }, [treeHeight])
+  }, [])
 
   // 是否显示预览
   const showPreview = previewContent || previewLoading || previewError
@@ -130,13 +170,15 @@ export const FileExplorer = memo(function FileExplorer({
 
   return (
     <div ref={containerRef} className="flex flex-col h-full">
-      {/* File Tree */}
+      {/* File Tree - 使用 CSS 变量控制高度 */}
       <div 
+        ref={treeRef}
         className="overflow-hidden flex flex-col shrink-0"
         style={{ 
-          height: showPreview ? (treeHeight ?? '40%') : '100%',
+          '--tree-height': treeHeight !== null ? `${treeHeight}px` : '40%',
+          height: showPreview ? 'var(--tree-height)' : '100%',
           minHeight: showPreview ? MIN_TREE_HEIGHT : undefined,
-        }}
+        } as React.CSSProperties}
       >
         {/* Tree Header */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border-100/50 shrink-0">
@@ -186,13 +228,13 @@ export const FileExplorer = memo(function FileExplorer({
         </div>
       </div>
 
-      {/* Resize Handle - 细线 + 悬停高亮 */}
+      {/* Resize Handle - 扩大拖拽区域 */}
       {showPreview && (
         <div
           className={`
-            h-px cursor-row-resize shrink-0 relative
-            hover:h-1 hover:bg-accent-main-100/50 transition-all
-            ${isResizing ? 'h-1 bg-accent-main-100' : 'bg-border-200/50'}
+            h-1.5 cursor-row-resize shrink-0 relative
+            hover:bg-accent-main-100/50 transition-all
+            ${isResizing ? 'bg-accent-main-100' : 'bg-border-200/50'}
           `}
           onMouseDown={handleResizeStart}
         />
@@ -207,6 +249,7 @@ export const FileExplorer = memo(function FileExplorer({
             isLoading={previewLoading}
             error={previewError}
             onClose={handleClosePreview}
+            isResizing={isAnyResizing}
           />
         </div>
       )}
@@ -322,9 +365,10 @@ interface FilePreviewProps {
   isLoading: boolean
   error: string | null
   onClose: () => void
+  isResizing?: boolean
 }
 
-function FilePreview({ path, content, isLoading, error, onClose }: FilePreviewProps) {
+function FilePreview({ path, content, isLoading, error, onClose, isResizing = false }: FilePreviewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   
   // 获取文件名
@@ -383,9 +427,9 @@ function FilePreview({ path, content, isLoading, error, onClose }: FilePreviewPr
             <span className="text-center">{error}</span>
           </div>
         ) : displayContent?.type === 'diff' ? (
-          <DiffPreview hunks={displayContent.hunks} />
+          <DiffPreview hunks={displayContent.hunks} isResizing={isResizing} />
         ) : displayContent?.type === 'text' ? (
-          <CodePreview code={displayContent.text} language={language || 'text'} />
+          <CodePreview code={displayContent.text} language={language || 'text'} isResizing={isResizing} />
         ) : (
           <div className="flex items-center justify-center h-full text-text-400 text-xs">
             No content
@@ -408,11 +452,15 @@ interface DiffPreviewProps {
     newLines: number
     lines: string[]
   }>
+  isResizing?: boolean
 }
 
-function DiffPreview({ hunks }: DiffPreviewProps) {
+function DiffPreview({ hunks, isResizing = false }: DiffPreviewProps) {
   return (
-    <div className="font-mono text-[11px] leading-relaxed">
+    <div 
+      className={`font-mono text-[11px] leading-relaxed ${isResizing ? 'whitespace-pre overflow-hidden' : ''}`} 
+      style={{ contain: 'content' }}
+    >
       {hunks.map((hunk, hunkIdx) => (
         <div key={hunkIdx} className="border-b border-border-100/30 last:border-0">
           {/* Hunk Header */}
@@ -456,45 +504,55 @@ function DiffPreview({ hunks }: DiffPreviewProps) {
 interface CodePreviewProps {
   code: string
   language: string
+  isResizing?: boolean
 }
 
 // 大文件阈值
 const LARGE_FILE_THRESHOLD = 1000
 
-function CodePreview({ code, language }: CodePreviewProps) {
+function CodePreview({ code, language, isResizing = false }: CodePreviewProps) {
   const lines = useMemo(() => code.split('\n'), [code])
   const isLargeFile = lines.length >= LARGE_FILE_THRESHOLD
   
   // 大文件用虚拟滚动
   if (isLargeFile) {
-    return <VirtualCodePreview code={code} language={language} lines={lines} />
+    return <VirtualCodePreview code={code} language={language} lines={lines} isResizing={isResizing} />
   }
   
   // 小文件直接渲染
-  return <SimpleCodePreview code={code} language={language} lines={lines} />
+  return <SimpleCodePreview code={code} language={language} lines={lines} isResizing={isResizing} />
 }
 
 // 小文件：直接渲染，支持换行
-function SimpleCodePreview({ code, language, lines }: { code: string; language: string; lines: string[] }) {
+// 在 resize 期间使用缓存的高亮结果，避免重新计算
+function SimpleCodePreview({ code, language, lines, isResizing }: { code: string; language: string; lines: string[]; isResizing: boolean }) {
   // text 类型不走高亮，避免 shiki 输出内联黑色样式
-  const enableHighlight = language !== 'text'
+  const enableHighlight = language !== 'text' && !isResizing // resize 时禁用高亮
   const { output: html, isLoading } = useSyntaxHighlight(code, { lang: language, enabled: enableHighlight })
+  
+  // 缓存高亮结果
+  const highlightedLinesRef = useRef<string[] | null>(null)
   
   // 解析高亮后的行
   const highlightedLines = useMemo(() => {
-    if (isLoading || !html) return null
+    if (isLoading || !html) return highlightedLinesRef.current
     
     const parser = new DOMParser()
     const doc = parser.parseFromString(html as string, 'text/html')
     const lineElements = doc.querySelectorAll('.line')
     
-    if (lineElements.length === 0) return null
+    if (lineElements.length === 0) return highlightedLinesRef.current
     
-    return Array.from(lineElements).map(el => el.innerHTML || '&nbsp;')
+    const result = Array.from(lineElements).map(el => el.innerHTML || '&nbsp;')
+    highlightedLinesRef.current = result
+    return result
   }, [html, isLoading])
   
   return (
-    <div className="font-mono text-[11px] leading-relaxed">
+    <div 
+      className={`font-mono text-[11px] leading-relaxed ${isResizing ? 'whitespace-pre overflow-hidden' : ''}`} 
+      style={{ contain: 'content' }}
+    >
       {lines.map((line, idx) => {
         const highlighted = highlightedLines?.[idx]
         const isHtml = highlighted && highlighted.includes('<')
@@ -506,11 +564,11 @@ function SimpleCodePreview({ code, language, lines }: { code: string; language: 
             </span>
             {isHtml ? (
               <span 
-                className="whitespace-pre-wrap break-all flex-1 min-w-0"
+                className={`flex-1 min-w-0 ${isResizing ? '' : 'whitespace-pre-wrap break-all'}`}
                 dangerouslySetInnerHTML={{ __html: highlighted }}
               />
             ) : (
-              <span className="text-text-200 whitespace-pre-wrap break-all flex-1 min-w-0">
+              <span className={`text-text-200 flex-1 min-w-0 ${isResizing ? '' : 'whitespace-pre-wrap break-all'}`}>
                 {highlighted || line || ' '}
               </span>
             )}
@@ -522,27 +580,33 @@ function SimpleCodePreview({ code, language, lines }: { code: string; language: 
 }
 
 // 大文件：虚拟滚动
-function VirtualCodePreview({ code, language, lines }: { code: string; language: string; lines: string[] }) {
-  // text 类型不走高亮
-  const enableHighlight = language !== 'text'
+// 在 resize 期间使用缓存的高亮结果，并跳过 ResizeObserver 更新
+function VirtualCodePreview({ code, language, lines, isResizing }: { code: string; language: string; lines: string[]; isResizing: boolean }) {
+  // text 类型不走高亮，resize 时也禁用以提高性能
+  const enableHighlight = language !== 'text' && !isResizing
   const { output: html, isLoading } = useSyntaxHighlight(code, { lang: language, enabled: enableHighlight })
   const containerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
   
+  // 缓存高亮结果
+  const highlightedLinesRef = useRef<string[] | null>(null)
+  
   const totalHeight = lines.length * LINE_HEIGHT
   
   // 解析高亮后的行
   const highlightedLines = useMemo(() => {
-    if (isLoading || !html) return null
+    if (isLoading || !html) return highlightedLinesRef.current
     
     const parser = new DOMParser()
     const doc = parser.parseFromString(html as string, 'text/html')
     const lineElements = doc.querySelectorAll('.line')
     
-    if (lineElements.length === 0) return null
+    if (lineElements.length === 0) return highlightedLinesRef.current
     
-    return Array.from(lineElements).map(el => el.innerHTML || '&nbsp;')
+    const result = Array.from(lineElements).map(el => el.innerHTML || '&nbsp;')
+    highlightedLinesRef.current = result
+    return result
   }, [html, isLoading])
   
   // 计算可见范围
@@ -557,24 +621,40 @@ function VirtualCodePreview({ code, language, lines }: { code: string; language:
     }
   }, [scrollTop, containerHeight, lines.length])
   
-  // 监听容器大小变化
+  // 监听容器大小变化 - resize 时完全跳过
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     
-    const updateHeight = () => setContainerHeight(container.clientHeight)
-    updateHeight()
+    // resize 时跳过 ResizeObserver
+    if (isResizing) return
+    
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    const updateHeight = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        setContainerHeight(container.clientHeight)
+      }, 50) 
+    }
+    
+    // 初始化立即执行
+    setContainerHeight(container.clientHeight)
     
     const resizeObserver = new ResizeObserver(updateHeight)
     resizeObserver.observe(container)
     
-    return () => resizeObserver.disconnect()
-  }, [])
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      resizeObserver.disconnect()
+    }
+  }, [isResizing])
   
-  // 处理滚动
+  // 处理滚动 - resize 时使用 throttle
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop)
-  }, [])
+    if (!isResizing) {
+      setScrollTop(e.currentTarget.scrollTop)
+    }
+  }, [isResizing])
   
   // 渲染可见行
   const visibleLines = useMemo(() => {
@@ -596,32 +676,37 @@ function VirtualCodePreview({ code, language, lines }: { code: string; language:
           </span>
           {isHtml ? (
             <span 
-              className="whitespace-pre leading-5 pr-4"
+              className={`leading-5 pr-4 ${isResizing ? 'whitespace-pre overflow-hidden' : 'whitespace-pre'}`}
               dangerouslySetInnerHTML={{ __html: highlighted }}
             />
           ) : (
-            <span className="text-text-200 whitespace-pre leading-5 pr-4">
+            <span className={`text-text-200 leading-5 pr-4 ${isResizing ? 'whitespace-pre overflow-hidden' : 'whitespace-pre'}`}>
               {highlighted || rawLine}
             </span>
           )}
         </div>
       )
     }
-    
     return result
-  }, [startIndex, endIndex, highlightedLines, lines])
-  
+  }, [startIndex, endIndex, lines, highlightedLines, isResizing])
+
   return (
     <div 
       ref={containerRef}
-      className="font-mono text-[11px] h-full overflow-auto custom-scrollbar"
+      className="h-full overflow-auto custom-scrollbar relative"
       onScroll={handleScroll}
+      style={{ contain: 'strict' }}
     >
-      {/* 外层撑高度，内层撑宽度 */}
       <div style={{ height: totalHeight, position: 'relative' }}>
         <div 
-          className="inline-block min-w-full"
-          style={{ transform: `translateY(${offsetY}px)` }}
+          style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            transform: `translateY(${offsetY}px)` 
+          }}
+          className="font-mono text-[11px] leading-relaxed"
         >
           {visibleLines}
         </div>

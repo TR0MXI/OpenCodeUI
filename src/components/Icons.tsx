@@ -139,6 +139,13 @@ export const PanelRightIcon = (props: IconProps) => (
   </DefaultIcon>
 )
 
+export const PanelBottomIcon = (props: IconProps) => (
+  <DefaultIcon {...props}>
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <line x1="3" y1="15" x2="21" y2="15" />
+  </DefaultIcon>
+)
+
 export const StopIcon = (props: IconProps) => (
   <DefaultIcon {...props}>
     <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />

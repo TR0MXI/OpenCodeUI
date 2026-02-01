@@ -1,9 +1,10 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { Header, InputBox, PermissionDialog, QuestionDialog, Sidebar, ChatArea, type ChatAreaHandle } from './features/chat'
 import { RightPanel } from './components/RightPanel'
+import { BottomPanel } from './components/BottomPanel'
 import { useTheme, useModels, useModelSelection, useChatSession } from './hooks'
-import { restoreModelSelection } from './utils'
 import { STORAGE_KEY_WIDE_MODE } from './constants'
+import { restoreModelSelection } from './utils/sessionHelpers'
 import type { Attachment } from './api'
 
 function App() {
@@ -140,11 +141,12 @@ function App() {
         onClose={() => setSidebarExpanded(false)}
       />
 
-      {/* Main Content Area Wrapper */}
+      {/* Main Content Area: Chat Column + Right Panel */}
       <div className="flex-1 flex min-w-0 h-screen overflow-hidden">
-        {/* Main Chat Column */}
-        <div className="flex-1 flex flex-col relative min-w-0 transition-all duration-300">
-          <div className="flex-1 relative overflow-hidden flex flex-col">
+        {/* Left Column: Chat + Bottom Panel */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Chat Area */}
+          <div className="flex-1 relative overflow-hidden flex flex-col min-h-0">
             {/* Header Overlay */}
             <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
               <div className="pointer-events-auto">
@@ -205,32 +207,35 @@ function App() {
                 registerInputBox={registerInputBox}
               />
             </div>
+
+            {/* Permission Dialog */}
+            {pendingPermissionRequests.length > 0 && (
+              <PermissionDialog
+                request={pendingPermissionRequests[0]}
+                onReply={(reply) => handlePermissionReply(pendingPermissionRequests[0].id, reply, effectiveDirectory)}
+                queueLength={pendingPermissionRequests.length}
+                isReplying={isReplying}
+                currentSessionId={routeSessionId}
+              />
+            )}
+
+            {/* Question Dialog */}
+            {pendingPermissionRequests.length === 0 && pendingQuestionRequests.length > 0 && (
+              <QuestionDialog
+                request={pendingQuestionRequests[0]}
+                onReply={(answers) => handleQuestionReply(pendingQuestionRequests[0].id, answers, effectiveDirectory)}
+                onReject={() => handleQuestionReject(pendingQuestionRequests[0].id, effectiveDirectory)}
+                queueLength={pendingQuestionRequests.length}
+                isReplying={isReplying}
+              />
+            )}
           </div>
 
-          {/* Permission Dialog */}
-          {pendingPermissionRequests.length > 0 && (
-            <PermissionDialog
-              request={pendingPermissionRequests[0]}
-              onReply={(reply) => handlePermissionReply(pendingPermissionRequests[0].id, reply, effectiveDirectory)}
-              queueLength={pendingPermissionRequests.length}
-              isReplying={isReplying}
-              currentSessionId={routeSessionId}
-            />
-          )}
-
-          {/* Question Dialog */}
-          {pendingPermissionRequests.length === 0 && pendingQuestionRequests.length > 0 && (
-            <QuestionDialog
-              request={pendingQuestionRequests[0]}
-              onReply={(answers) => handleQuestionReply(pendingQuestionRequests[0].id, answers, effectiveDirectory)}
-              onReject={() => handleQuestionReject(pendingQuestionRequests[0].id, effectiveDirectory)}
-              queueLength={pendingQuestionRequests.length}
-              isReplying={isReplying}
-            />
-          )}
+          {/* Bottom Panel */}
+          <BottomPanel directory={effectiveDirectory} />
         </div>
 
-        {/* Right Panel */}
+        {/* Right Panel - 占满整个高度 */}
         <RightPanel />
       </div>
     </div>

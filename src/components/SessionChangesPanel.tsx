@@ -7,10 +7,12 @@ import { detectLanguage } from '../utils/languageUtils'
 
 interface SessionChangesPanelProps {
   sessionId: string
+  isResizing?: boolean
 }
 
 export const SessionChangesPanel = memo(function SessionChangesPanel({
   sessionId,
+  isResizing = false,
 }: SessionChangesPanelProps) {
   const [loading, setLoading] = useState(false)
   const [diffs, setDiffs] = useState<FileDiff[]>([])
@@ -168,6 +170,7 @@ export const SessionChangesPanel = memo(function SessionChangesPanel({
                     after={diff.after} 
                     language={language}
                     viewMode={viewMode}
+                    isResizing={isResizing}
                   />
                 </div>
               )}

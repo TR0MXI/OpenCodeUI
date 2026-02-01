@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { ComposeIcon, CogIcon, MoreHorizontalIcon, TeachIcon, SidebarIcon, MaximizeIcon, MinimizeIcon, SunIcon, MoonIcon, SystemIcon, ShareIcon, PanelRightIcon } from '../../components/Icons'
+import { ComposeIcon, CogIcon, MoreHorizontalIcon, TeachIcon, SidebarIcon, MaximizeIcon, MinimizeIcon, SunIcon, MoonIcon, SystemIcon, ShareIcon, PanelRightIcon, PanelBottomIcon } from '../../components/Icons'
 import { DropdownMenu, MenuItem, IconButton } from '../../components/ui'
 import { ModelSelector } from './ModelSelector'
 import { SettingsDialog } from '../settings/SettingsDialog'
@@ -36,7 +36,7 @@ export function Header({
   onToggleWideMode,
 }: HeaderProps) {
   const { shareUrl, messages } = useMessageStore()
-  const { rightPanelOpen } = useLayoutStore()
+  const { rightPanelOpen, bottomPanelOpen } = useLayoutStore()
   
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
@@ -111,6 +111,21 @@ export function Header({
             {isWideMode ? <MinimizeIcon size={18} /> : <MaximizeIcon size={18} />}
           </IconButton>
         )}
+
+        {/* Bottom Panel Toggle */}
+        <IconButton
+          aria-label={bottomPanelOpen ? "Close bottom panel" : "Open bottom panel"}
+          onClick={() => layoutStore.toggleBottomPanel()}
+          className={`
+            transition-colors
+            ${bottomPanelOpen
+              ? 'text-accent-main-100 bg-bg-200/50' 
+              : 'text-text-400 hover:text-text-100 hover:bg-bg-200/50'
+            }
+          `}
+        >
+          <PanelBottomIcon size={18} />
+        </IconButton>
 
         {/* Right Panel Toggle */}
         <IconButton

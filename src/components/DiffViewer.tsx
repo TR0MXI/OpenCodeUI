@@ -1,8 +1,9 @@
 /**
  * DiffViewer - 核心 Diff 渲染组件
+ * 性能优化：在 resize 期间跳过词级别 diff 计算，使用缓存结果
  */
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import { diffLines, diffWords } from 'diff'
 
 // ============================================
@@ -16,6 +17,7 @@ export interface DiffViewerProps {
   after: string
   language?: string
   viewMode?: ViewMode
+  isResizing?: boolean
 }
 
 export type LineType = 'add' | 'delete' | 'context' | 'empty'
@@ -45,13 +47,14 @@ export const DiffViewer = memo(function DiffViewer({
   before,
   after,
   viewMode = 'split',
+  isResizing = false,
 }: DiffViewerProps) {
   return (
-    <div className="flex-1 overflow-auto custom-scrollbar font-mono text-[13px] leading-6">
+    <div className="flex-1 overflow-auto custom-scrollbar font-mono text-[13px] leading-6" style={{ contain: 'content' }}>
       {viewMode === 'split' ? (
-        <SplitDiffView before={before} after={after} />
+        <SplitDiffView before={before} after={after} isResizing={isResizing} />
       ) : (
-        <UnifiedDiffView before={before} after={after} />
+        <UnifiedDiffView before={before} after={after} isResizing={isResizing} />
       )}
     </div>
   )
@@ -61,10 +64,19 @@ export const DiffViewer = memo(function DiffViewer({
 // Split Diff View
 // ============================================
 
-const SplitDiffView = memo(function SplitDiffView({ before, after }: { before: string, after: string }) {
+const SplitDiffView = memo(function SplitDiffView({ before, after, isResizing }: { before: string, after: string, isResizing: boolean }) {
+  // 缓存计算结果
+  const cachedRef = useRef<PairedLine[] | null>(null)
+  
   const pairedLines = useMemo(() => {
-    return computePairedLines(before, after)
-  }, [before, after])
+    // resize 时使用缓存
+    if (isResizing && cachedRef.current) {
+      return cachedRef.current
+    }
+    const result = computePairedLines(before, after, isResizing)
+    cachedRef.current = result
+    return result
+  }, [before, after, isResizing])
 
   if (pairedLines.length === 0) {
     return <div className="p-8 text-text-400 text-sm text-center">No changes</div>
@@ -82,7 +94,7 @@ const SplitDiffView = memo(function SplitDiffView({ before, after }: { before: s
             <div className="w-12 shrink-0 px-2 text-right text-text-500 select-none opacity-60">
               {pair.left.lineNo}
             </div>
-            <div className="flex-1 px-3 whitespace-pre-wrap break-all min-w-0">
+            <div className={`flex-1 px-3 min-w-0 ${isResizing ? 'whitespace-pre overflow-hidden' : 'whitespace-pre-wrap break-all'}`}>
               {pair.left.type === 'delete' && (
                 <span className="text-danger-100 select-none mr-1 inline-block w-3">−</span>
               )}
@@ -108,7 +120,7 @@ const SplitDiffView = memo(function SplitDiffView({ before, after }: { before: s
             <div className="w-12 shrink-0 px-2 text-right text-text-500 select-none opacity-60">
               {pair.right.lineNo}
             </div>
-            <div className="flex-1 px-3 whitespace-pre-wrap break-all min-w-0">
+            <div className={`flex-1 px-3 min-w-0 ${isResizing ? 'whitespace-pre overflow-hidden' : 'whitespace-pre-wrap break-all'}`}>
               {pair.right.type === 'add' && (
                 <span className="text-success-100 select-none mr-1 inline-block w-3">+</span>
               )}
@@ -131,10 +143,19 @@ const SplitDiffView = memo(function SplitDiffView({ before, after }: { before: s
 // Unified Diff View
 // ============================================
 
-const UnifiedDiffView = memo(function UnifiedDiffView({ before, after }: { before: string, after: string }) {
+const UnifiedDiffView = memo(function UnifiedDiffView({ before, after, isResizing }: { before: string, after: string, isResizing: boolean }) {
+  // 缓存计算结果
+  const cachedRef = useRef<UnifiedLine[] | null>(null)
+  
   const lines = useMemo(() => {
-    return computeUnifiedLines(before, after)
-  }, [before, after])
+    // resize 时使用缓存
+    if (isResizing && cachedRef.current) {
+      return cachedRef.current
+    }
+    const result = computeUnifiedLines(before, after)
+    cachedRef.current = result
+    return result
+  }, [before, after, isResizing])
 
   if (lines.length === 0) {
     return <div className="p-8 text-text-400 text-sm text-center">No changes</div>
@@ -153,7 +174,7 @@ const UnifiedDiffView = memo(function UnifiedDiffView({ before, after }: { befor
           <div className="w-12 shrink-0 px-2 text-right text-text-500 select-none opacity-60">
             {line.newLineNo}
           </div>
-          <div className="flex-1 px-3 whitespace-pre-wrap break-all min-w-0">
+          <div className={`flex-1 px-3 min-w-0 ${isResizing ? 'whitespace-pre overflow-hidden' : 'whitespace-pre-wrap break-all'}`}>
             {line.type === 'add' && (
               <span className="text-success-100 select-none mr-1 inline-block w-3">+</span>
             )}
@@ -184,7 +205,7 @@ function getLineBgClass(type: LineType): string {
   }
 }
 
-function computePairedLines(before: string, after: string): PairedLine[] {
+function computePairedLines(before: string, after: string, skipWordDiff: boolean = false): PairedLine[] {
   const changes = diffLines(before, after)
   const result: PairedLine[] = []
   
@@ -211,7 +232,9 @@ function computePairedLines(before: string, after: string): PairedLine[] {
           
           let leftHighlight: string | undefined
           let rightHighlight: string | undefined
-          if (oldLine !== undefined && newLine !== undefined) {
+          
+          // resize 时跳过词级别 diff 计算以提高性能
+          if (!skipWordDiff && oldLine !== undefined && newLine !== undefined) {
              const wordDiff = computeWordDiff(oldLine, newLine)
              if (!isTooFragmented(wordDiff.changes)) {
                leftHighlight = wordDiff.left
