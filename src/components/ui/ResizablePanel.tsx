@@ -37,12 +37,16 @@ export const ResizablePanel = memo(function ResizablePanel({
 
   // 同步 size 到 ref 和 CSS 变量
   useLayoutEffect(() => {
-    if (!isResizing && panelRef.current && !isMobile) {
-      const cssVar = position === 'right' ? '--panel-width' : '--panel-height'
-      panelRef.current.style.setProperty(cssVar, `${size}px`)
-      currentSizeRef.current = size
-    }
-  }, [size, isResizing, isMobile, position])
+    if (isMobile || !panelRef.current) return
+    
+    // 不要在 resize 过程中响应 size prop 变化（虽然通常 resize 时 prop 不会变）
+    // 也不要响应 isResizing 的变化（防止 resize 结束时用旧 prop 覆盖新 DOM）
+    if (isResizing) return
+
+    const cssVar = position === 'right' ? '--panel-width' : '--panel-height'
+    panelRef.current.style.setProperty(cssVar, `${size}px`)
+    currentSizeRef.current = size
+  }, [size, isMobile, position]) // 移除 isResizing 依赖
 
   // Desktop Resize 逻辑
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -65,7 +69,7 @@ export const ResizablePanel = memo(function ResizablePanel({
     window.dispatchEvent(new CustomEvent('panel-resize-start'))
     
     // 暂时保持 display: none 以确保流畅度，如果需要实时预览可以去掉
-    content.style.display = 'none'
+    // content.style.display = 'none'
     
     const startX = e.clientX
     const startY = e.clientY
@@ -95,7 +99,7 @@ export const ResizablePanel = memo(function ResizablePanel({
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       
       if (content) {
-        content.style.display = ''
+        // content.style.display = ''
         window.dispatchEvent(new CustomEvent('panel-resize-end'))
       }
       
