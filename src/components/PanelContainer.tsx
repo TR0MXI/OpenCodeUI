@@ -9,6 +9,7 @@ import {
   CloseIcon, 
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronLeftIcon,
   TerminalIcon,
   FolderIcon,
   GitCommitIcon,
@@ -79,6 +80,49 @@ export const PanelContainer = memo(function PanelContainer({
   const [addMenuPos, setAddMenuPos] = useState<{ x: number; y: number } | null>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const addButtonRef = useRef<HTMLButtonElement>(null)
+  
+  // 滚动溢出状态
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+  
+  // 检测滚动溢出
+  const updateScrollState = useCallback(() => {
+    const container = tabsContainerRef.current
+    if (!container) return
+    
+    const { scrollLeft, scrollWidth, clientWidth } = container
+    setCanScrollLeft(scrollLeft > 2)
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 2)
+  }, [])
+  
+  // 监听滚动和尺寸变化
+  useEffect(() => {
+    const container = tabsContainerRef.current
+    if (!container) return
+    
+    updateScrollState()
+    
+    container.addEventListener('scroll', updateScrollState)
+    const resizeObserver = new ResizeObserver(updateScrollState)
+    resizeObserver.observe(container)
+    
+    return () => {
+      container.removeEventListener('scroll', updateScrollState)
+      resizeObserver.disconnect()
+    }
+  }, [updateScrollState, tabs.length])
+  
+  // 滚动按钮处理
+  const scrollTabs = useCallback((direction: 'left' | 'right') => {
+    const container = tabsContainerRef.current
+    if (!container) return
+    
+    const scrollAmount = 120
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    })
+  }, [])
 
   // 点击外部关闭 add 菜单
   useEffect(() => {
@@ -177,9 +221,23 @@ export const PanelContainer = memo(function PanelContainer({
   return (
     <>
       {/* Header with Tabs */}
-      <div className="flex items-center justify-between px-2 py-1 shrink-0 border-b border-border-200/30 h-10">
+      <div className="flex items-center justify-between px-1 py-1 shrink-0 border-b border-border-200/30 h-10">
+        {/* Left scroll button */}
+        {canScrollLeft && (
+          <button
+            onClick={() => scrollTabs('left')}
+            className="p-1 text-text-400 hover:text-text-100 hover:bg-bg-200/50 rounded transition-colors shrink-0"
+            title="Scroll left"
+          >
+            <ChevronLeftIcon size={14} />
+          </button>
+        )}
+        
         {/* Tabs Container - 水平滚动 */}
-        <div ref={tabsContainerRef} className="flex items-center gap-0.5 flex-1 min-w-0 tabs-scrollbar">
+        <div 
+          ref={tabsContainerRef} 
+          className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto scrollbar-none px-1"
+        >
           {tabs.map((tab) => (
             <PanelTabButton
               key={tab.id}
@@ -209,7 +267,7 @@ export const PanelContainer = memo(function PanelContainer({
                 }
               }}
               className={`
-                p-1.5 ml-1 rounded-md transition-colors shrink-0
+                p-1.5 ml-0.5 rounded-md transition-colors shrink-0
                 ${addMenuPos 
                   ? 'bg-bg-200 text-text-100' 
                   : 'text-text-400 hover:text-text-100 hover:bg-bg-200/50'
@@ -221,9 +279,20 @@ export const PanelContainer = memo(function PanelContainer({
             </button>
           )}
         </div>
+        
+        {/* Right scroll button */}
+        {canScrollRight && (
+          <button
+            onClick={() => scrollTabs('right')}
+            className="p-1 text-text-400 hover:text-text-100 hover:bg-bg-200/50 rounded transition-colors shrink-0"
+            title="Scroll right"
+          >
+            <ChevronRightIcon size={14} />
+          </button>
+        )}
 
         {/* Actions */}
-        <div className="flex items-center gap-1 shrink-0 ml-2">
+        <div className="flex items-center gap-0.5 shrink-0 ml-1 border-l border-border-200/30 pl-1">
           <button
             onClick={handleCollapse}
             className="p-1.5 text-text-400 hover:text-text-100 hover:bg-bg-200/50 rounded-md transition-colors"

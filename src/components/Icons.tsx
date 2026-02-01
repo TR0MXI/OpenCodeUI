@@ -312,6 +312,12 @@ export const ChevronRightIcon = (props: IconProps) => (
   </DefaultIcon>
 )
 
+export const ChevronLeftIcon = (props: IconProps) => (
+  <DefaultIcon {...props}>
+    <path d="m15 18-6-6 6-6" />
+  </DefaultIcon>
+)
+
 export const ReturnIcon = (props: IconProps) => (
   <DefaultIcon {...props}>
     <polyline points="9 10 4 15 9 20" />
