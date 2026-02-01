@@ -120,40 +120,39 @@ export const DiffModal = memo(function DiffModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex flex-col transition-all duration-200 ease-out"
-      style={{
-        backgroundColor: isVisible ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0)',
-        backdropFilter: isVisible ? 'blur(4px)' : 'blur(0px)',
-      }}
+      className="fixed inset-0 z-[100] flex flex-col transition-all duration-200 ease-out bg-bg-000/95 backdrop-blur-sm"
+      style={{ opacity: isVisible ? 1 : 0 }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
       {/* Header */}
       <div 
-        className="flex items-center justify-between px-4 py-3 border-b border-white/10 transition-all duration-200"
+        className="flex items-center justify-between px-4 py-3 border-b border-border-200 bg-bg-100 transition-all duration-200"
         style={{ opacity: isVisible ? 1 : 0 }}
       >
         <div className="flex items-center gap-4">
           {fileName && (
-            <span className="text-white/90 font-mono text-sm font-medium">{fileName}</span>
+            <span className="text-text-100 font-mono text-sm font-medium">{fileName}</span>
           )}
           <div className="flex items-center gap-3 text-xs font-mono">
             {diffStats.additions > 0 && (
-              <span className="text-green-400">+{diffStats.additions}</span>
+              <span className="text-success-100">+{diffStats.additions}</span>
             )}
             {diffStats.deletions > 0 && (
-              <span className="text-red-400">-{diffStats.deletions}</span>
+              <span className="text-danger-100">-{diffStats.deletions}</span>
             )}
           </div>
         </div>
         
         <div className="flex items-center gap-3">
           {/* 视图模式切换 */}
-          <div className="flex items-center bg-white/10 rounded-md p-0.5 text-xs">
+          <div className="flex items-center bg-bg-200 rounded-md p-0.5 text-xs">
             <button
               className={`px-3 py-1 rounded transition-colors ${
-                viewMode === 'split' ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white/80'
+                viewMode === 'split' 
+                  ? 'bg-bg-000 text-text-100 shadow-sm' 
+                  : 'text-text-400 hover:text-text-200'
               }`}
               onClick={() => setViewMode('split')}
             >
@@ -161,7 +160,9 @@ export const DiffModal = memo(function DiffModal({
             </button>
             <button
               className={`px-3 py-1 rounded transition-colors ${
-                viewMode === 'unified' ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white/80'
+                viewMode === 'unified' 
+                  ? 'bg-bg-000 text-text-100 shadow-sm' 
+                  : 'text-text-400 hover:text-text-200'
               }`}
               onClick={() => setViewMode('unified')}
             >
@@ -171,7 +172,7 @@ export const DiffModal = memo(function DiffModal({
           
           <button
             onClick={onClose}
-            className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+            className="p-1.5 text-text-400 hover:text-text-100 hover:bg-bg-200 rounded-md transition-colors"
           >
             <CloseIcon size={18} />
           </button>
@@ -180,7 +181,7 @@ export const DiffModal = memo(function DiffModal({
 
       {/* Content */}
       <div 
-        className="flex-1 overflow-auto custom-scrollbar transition-all duration-200"
+        className="flex-1 overflow-auto custom-scrollbar transition-all duration-200 bg-bg-000"
         style={{ opacity: isVisible ? 1 : 0 }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -249,25 +250,25 @@ const SplitDiffView = memo(function SplitDiffView({ before, after, language }: D
   }, [before, after, oldTokens, newTokens])
 
   if (oldLines.length === 0) {
-    return <div className="p-4 text-white/50 text-sm animate-pulse">Loading...</div>
+    return <div className="p-4 text-text-400 text-sm animate-pulse">Loading...</div>
   }
 
   return (
     <div className="flex min-h-full">
       {/* Left (Before) */}
-      <div className="flex-1 border-r border-white/10 overflow-x-auto">
-        <div className="px-3 py-1.5 text-xs text-white/40 border-b border-white/10 sticky top-0 bg-black/50 backdrop-blur">
+      <div className="flex-1 border-r border-border-200 overflow-x-auto">
+        <div className="px-3 py-1.5 text-xs text-text-400 border-b border-border-200 sticky top-0 bg-bg-100/90 backdrop-blur">
           Before
         </div>
         <table className="w-full border-collapse text-xs font-mono">
           <tbody>
             {oldLines.map((line, idx) => (
-              <tr key={idx} className={line.type === 'delete' ? 'bg-red-500/20' : ''}>
-                <td className="px-2 py-0.5 text-right text-white/30 select-none w-12 align-top border-r border-white/5">
+              <tr key={idx} className={line.type === 'delete' ? 'bg-danger-bg' : ''}>
+                <td className="px-2 py-0.5 text-right text-text-500 select-none w-12 align-top border-r border-border-100">
                   {line.oldLineNo}
                 </td>
-                <td className="px-3 py-0.5 whitespace-pre text-white/90 align-top">
-                  {line.type === 'delete' && <span className="text-red-400 mr-2 select-none">-</span>}
+                <td className="px-3 py-0.5 whitespace-pre text-text-100 align-top">
+                  {line.type === 'delete' && <span className="text-danger-100 mr-2 select-none">-</span>}
                   <span dangerouslySetInnerHTML={{ __html: line.content }} />
                 </td>
               </tr>
@@ -278,18 +279,18 @@ const SplitDiffView = memo(function SplitDiffView({ before, after, language }: D
       
       {/* Right (After) */}
       <div className="flex-1 overflow-x-auto">
-        <div className="px-3 py-1.5 text-xs text-white/40 border-b border-white/10 sticky top-0 bg-black/50 backdrop-blur">
+        <div className="px-3 py-1.5 text-xs text-text-400 border-b border-border-200 sticky top-0 bg-bg-100/90 backdrop-blur">
           After
         </div>
         <table className="w-full border-collapse text-xs font-mono">
           <tbody>
             {newLines.map((line, idx) => (
-              <tr key={idx} className={line.type === 'add' ? 'bg-green-500/20' : ''}>
-                <td className="px-2 py-0.5 text-right text-white/30 select-none w-12 align-top border-r border-white/5">
+              <tr key={idx} className={line.type === 'add' ? 'bg-success-bg' : ''}>
+                <td className="px-2 py-0.5 text-right text-text-500 select-none w-12 align-top border-r border-border-100">
                   {line.newLineNo}
                 </td>
-                <td className="px-3 py-0.5 whitespace-pre text-white/90 align-top">
-                  {line.type === 'add' && <span className="text-green-400 mr-2 select-none">+</span>}
+                <td className="px-3 py-0.5 whitespace-pre text-text-100 align-top">
+                  {line.type === 'add' && <span className="text-success-100 mr-2 select-none">+</span>}
                   <span dangerouslySetInnerHTML={{ __html: line.content }} />
                 </td>
               </tr>
@@ -350,7 +351,7 @@ const UnifiedDiffView = memo(function UnifiedDiffView({ before, after, language 
   }, [before, after, oldTokens, newTokens])
 
   if (lines.length === 0) {
-    return <div className="p-4 text-white/50 text-sm animate-pulse">Loading...</div>
+    return <div className="p-4 text-text-400 text-sm animate-pulse">Loading...</div>
   }
 
   return (
@@ -358,19 +359,19 @@ const UnifiedDiffView = memo(function UnifiedDiffView({ before, after, language 
       <table className="w-full border-collapse text-xs font-mono">
         <tbody>
           {lines.map((line, idx) => {
-            const bgClass = line.type === 'add' ? 'bg-green-500/20' :
-                           line.type === 'delete' ? 'bg-red-500/20' : ''
+            const bgClass = line.type === 'add' ? 'bg-success-bg' :
+                           line.type === 'delete' ? 'bg-danger-bg' : ''
             return (
               <tr key={idx}>
-                <td className={`px-2 py-0.5 text-right text-white/30 select-none w-12 align-top border-r border-white/5 ${bgClass}`}>
+                <td className={`px-2 py-0.5 text-right text-text-500 select-none w-12 align-top border-r border-border-100 ${bgClass}`}>
                   {line.type !== 'add' && line.oldLineNo}
                 </td>
-                <td className={`px-2 py-0.5 text-right text-white/30 select-none w-12 align-top border-r border-white/5 ${bgClass}`}>
+                <td className={`px-2 py-0.5 text-right text-text-500 select-none w-12 align-top border-r border-border-100 ${bgClass}`}>
                   {line.type !== 'delete' && line.newLineNo}
                 </td>
-                <td className={`px-3 py-0.5 whitespace-pre text-white/90 align-top ${bgClass}`}>
-                  {line.type === 'add' && <span className="text-green-400 mr-2 select-none">+</span>}
-                  {line.type === 'delete' && <span className="text-red-400 mr-2 select-none">-</span>}
+                <td className={`px-3 py-0.5 whitespace-pre text-text-100 align-top ${bgClass}`}>
+                  {line.type === 'add' && <span className="text-success-100 mr-2 select-none">+</span>}
+                  {line.type === 'delete' && <span className="text-danger-100 mr-2 select-none">-</span>}
                   <span dangerouslySetInnerHTML={{ __html: line.content }} />
                 </td>
               </tr>
