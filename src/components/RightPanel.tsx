@@ -1,97 +1,20 @@
-// ============================================
-// RightPanel - 右侧面板容器
-// 支持多标签、resize、右键菜单移动
-// 性能优化：resize 期间使用 CSS visibility:hidden 完全跳过布局计算
-// ============================================
-
-import { memo, useState, useCallback, useRef, useLayoutEffect } from 'react'
+import { memo, useCallback } from 'react'
 import { useLayoutStore, layoutStore, type PanelTab } from '../store/layoutStore'
 import { PanelContainer } from './PanelContainer'
 import { SessionChangesPanel } from './SessionChangesPanel'
 import { FileExplorer } from './FileExplorer'
 import { Terminal } from './Terminal'
 import { useMessageStore } from '../store'
-import { useDirectory, useIsMobile } from '../hooks'
+import { useDirectory } from '../hooks'
 import { createPtySession, removePtySession } from '../api/pty'
 import type { TerminalTab } from '../store/layoutStore'
-
-const MIN_WIDTH = 300
-const MAX_WIDTH = 800
+import { ResizablePanel } from './ui/ResizablePanel'
 
 export const RightPanel = memo(function RightPanel() {
   const { rightPanelOpen, rightPanelWidth, previewFile } = useLayoutStore()
   const { sessionId } = useMessageStore()
   const { currentDirectory } = useDirectory()
-  const isMobile = useIsMobile()
   
-  const [isResizing, setIsResizing] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const rafRef = useRef<number>(0)
-  const currentWidthRef = useRef(rightPanelWidth)
-
-  // 同步 store 宽度到 CSS 变量
-  useLayoutEffect(() => {
-    if (!isResizing && panelRef.current && !isMobile) {
-      panelRef.current.style.setProperty('--panel-width', `${rightPanelWidth}px`)
-      currentWidthRef.current = rightPanelWidth
-    }
-  }, [rightPanelWidth, isResizing, isMobile])
-
-  const startResizing = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    
-    const panel = panelRef.current
-    const content = contentRef.current
-    if (!panel || !content) return
-    
-    setIsResizing(true)
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    
-    // 立即隐藏内容以跳过布局计算
-    window.dispatchEvent(new CustomEvent('panel-resize-start'))
-    content.style.display = 'none'
-    
-    const startX = e.clientX
-    const startWidth = currentWidthRef.current
-    
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-      }
-      
-      rafRef.current = requestAnimationFrame(() => {
-        const deltaX = startX - moveEvent.clientX
-        const newWidth = Math.min(Math.max(startWidth + deltaX, MIN_WIDTH), MAX_WIDTH)
-        panel.style.setProperty('--panel-width', `${newWidth}px`)
-        currentWidthRef.current = newWidth
-      })
-    }
-    
-    const handleMouseUp = () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-      }
-      
-      if (content) {
-        content.style.display = ''
-        window.dispatchEvent(new CustomEvent('panel-resize-end'))
-      }
-      
-      setIsResizing(false)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-      
-      layoutStore.setRightPanelWidth(currentWidthRef.current)
-    }
-    
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [])
-
   // 关闭终端时清理 PTY 会话
   const handleCloseTerminal = useCallback(async (ptyId: string) => {
     try {
@@ -135,7 +58,7 @@ export const RightPanel = memo(function RightPanel() {
             directory={currentDirectory}
             previewFile={previewFile}
             position="right"
-            isPanelResizing={isResizing}
+            isPanelResizing={false} // Panel resizing is handled by ResizablePanel
           />
         )
       case 'changes':
@@ -146,7 +69,7 @@ export const RightPanel = memo(function RightPanel() {
             </div>
           )
         }
-        return <SessionChangesPanel sessionId={sessionId} isResizing={isResizing} />
+        return <SessionChangesPanel sessionId={sessionId} isResizing={false} />
       case 'terminal':
         return (
           <TerminalContent
@@ -157,55 +80,20 @@ export const RightPanel = memo(function RightPanel() {
       default:
         return null
     }
-  }, [currentDirectory, previewFile, sessionId, isResizing])
+  }, [currentDirectory, previewFile, sessionId])
 
   return (
-    <>
-      <div 
-        ref={panelRef}
-        style={!isMobile ? { 
-          '--panel-width': `${rightPanelWidth}px`,
-          width: rightPanelOpen ? 'var(--panel-width)' : 0 
-        } as React.CSSProperties : undefined}
-        className={`
-          flex flex-col bg-bg-100 overflow-hidden
-          ${isMobile 
-            ? `fixed inset-0 z-[100] w-full shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${rightPanelOpen ? 'translate-x-0' : 'translate-x-full'}` 
-            : `relative h-full ${rightPanelOpen ? 'border-l border-border-200/50' : ''} ${isResizing ? 'transition-none' : 'transition-[width] duration-200 ease-out'}`
-          }
-        `}
-      >
-        {/* Content Container */}
-        <div 
-          ref={contentRef}
-          className={`flex flex-col w-full h-full ${!isMobile ? 'absolute top-0 right-0 bottom-0' : ''}`}
-          style={!isMobile ? { width: 'var(--panel-width)' } : undefined}
-        >
-          
-          {/* Resize Handle - PC Only */}
-          {!isMobile && (
-            <div
-              className={`
-                absolute top-0 left-0 bottom-0 w-2 cursor-col-resize z-50
-                hover:bg-accent-main-100/30 active:bg-accent-main-100/50 transition-colors
-                ${isResizing ? 'bg-accent-main-100/50' : 'bg-transparent'}
-              `}
-              onMouseDown={startResizing}
-            />
-          )}
-
-          {/* Resize Overlay */}
-          {!isMobile && isResizing && (
-            <div className="absolute inset-0 z-40 bg-transparent pointer-events-auto" />
-          )}
-
-          {/* Panel Container with Tabs */}
-          <PanelContainer position="right" onNewTerminal={handleNewTerminal} onCloseTerminal={handleCloseTerminal}>
-            {renderContent}
-          </PanelContainer>
-        </div>
-      </div>
-    </>
+    <ResizablePanel
+      position="right"
+      isOpen={rightPanelOpen}
+      size={rightPanelWidth}
+      onSizeChange={layoutStore.setRightPanelWidth}
+      onClose={layoutStore.closeRightPanel}
+    >
+      <PanelContainer position="right" onNewTerminal={handleNewTerminal} onCloseTerminal={handleCloseTerminal}>
+        {renderContent}
+      </PanelContainer>
+    </ResizablePanel>
   )
 })
 

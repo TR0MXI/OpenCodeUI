@@ -1,10 +1,4 @@
-// ============================================
-// BottomPanel - 底部面板容器
-// 支持多标签、resize、右键菜单移动
-// 性能优化：resize 期间使用 CSS visibility:hidden 完全跳过布局计算
-// ============================================
-
-import { memo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react'
+import { memo, useCallback, useState, useEffect } from 'react'
 import { Terminal } from './Terminal'
 import { TerminalIcon } from './Icons'
 import { PanelContainer } from './PanelContainer'
@@ -13,11 +7,7 @@ import { createPtySession, removePtySession, listPtySessions } from '../api/pty'
 import { SessionChangesPanel } from './SessionChangesPanel'
 import { FileExplorer } from './FileExplorer'
 import { useMessageStore } from '../store'
-import { useIsMobile } from '../hooks'
-
-// 常量
-const MIN_HEIGHT = 100
-const MAX_HEIGHT = 600
+import { ResizablePanel } from './ui/ResizablePanel'
 
 interface BottomPanelProps {
   directory?: string
@@ -26,28 +16,14 @@ interface BottomPanelProps {
 export const BottomPanel = memo(function BottomPanel({ directory }: BottomPanelProps) {
   const { bottomPanelOpen, bottomPanelHeight, previewFile } = useLayoutStore()
   const { sessionId } = useMessageStore()
-  const isMobile = useIsMobile()
   
-  const [isResizing, setIsResizing] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const restoredRef = useRef(false)
-  const rafRef = useRef<number>(0)
-  const currentHeightRef = useRef(bottomPanelHeight)
-
-  // 同步 store 高度到 CSS 变量
-  useLayoutEffect(() => {
-    if (!isResizing && panelRef.current && !isMobile) {
-      panelRef.current.style.setProperty('--panel-height', `${bottomPanelHeight}px`)
-      currentHeightRef.current = bottomPanelHeight
-    }
-  }, [bottomPanelHeight, isResizing, isMobile])
+  const [restored, setRestored] = useState(false)
 
   // 页面加载时恢复已有的 PTY sessions
   useEffect(() => {
-    if (restoredRef.current || !directory) return
-    restoredRef.current = true
+    if (restored || !directory) return
+    setRestored(true)
 
     const restoreSessions = async () => {
       try {
@@ -75,7 +51,7 @@ export const BottomPanel = memo(function BottomPanel({ directory }: BottomPanelP
     }
 
     restoreSessions()
-  }, [directory])
+  }, [directory, restored])
 
   // 创建新终端
   const handleNewTerminal = useCallback(async () => {
@@ -102,106 +78,6 @@ export const BottomPanel = memo(function BottomPanel({ directory }: BottomPanelP
       // ignore - may already be closed
     }
   }, [directory])
-
-  // PC 端拖拽调整高度
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    
-    const panel = panelRef.current
-    const content = contentRef.current
-    if (!panel || !content) return
-    
-    setIsResizing(true)
-    document.body.style.cursor = 'row-resize'
-    document.body.style.userSelect = 'none'
-    
-    window.dispatchEvent(new CustomEvent('panel-resize-start'))
-    content.style.display = 'none'
-    
-    const startY = e.clientY
-    const startHeight = currentHeightRef.current
-    
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-      }
-      
-      rafRef.current = requestAnimationFrame(() => {
-        const deltaY = startY - moveEvent.clientY
-        const newHeight = Math.min(Math.max(startHeight + deltaY, MIN_HEIGHT), MAX_HEIGHT)
-        panel.style.setProperty('--panel-height', `${newHeight}px`)
-        currentHeightRef.current = newHeight
-      })
-    }
-    
-    const handleMouseUp = () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-      }
-      
-      if (content) {
-        content.style.display = ''
-        window.dispatchEvent(new CustomEvent('panel-resize-end'))
-      }
-      
-      setIsResizing(false)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-      
-      layoutStore.setBottomPanelHeight(currentHeightRef.current)
-    }
-    
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-  }, [])
-
-  // 移动端 Touch Resize
-  const handleTouchResizeStart = useCallback((e: React.TouchEvent) => {
-    const panel = panelRef.current
-    const content = contentRef.current
-    if (!panel) return
-    
-    setIsResizing(true)
-    
-    if (content) {
-        // Mobile 上也可以尝试隐藏内容以提高性能，或者保留以直观看到效果
-        // 考虑到 mobile 性能，隐藏可能更好，但用户体验可能变差（看不到内容变化）
-        // 暂时不隐藏，如果卡顿再优化
-        // content.style.display = 'none'
-    }
-
-    const startY = e.touches[0].clientY
-    const startHeight = panel.getBoundingClientRect().height
-    
-    const handleTouchMove = (moveEvent: TouchEvent) => {
-       moveEvent.preventDefault() // 防止页面滚动
-       const touchY = moveEvent.touches[0].clientY
-       const deltaY = startY - touchY
-       const newHeight = Math.min(Math.max(startHeight + deltaY, 200), window.innerHeight * 0.9)
-       
-       panel.style.height = `${newHeight}px`
-       currentHeightRef.current = newHeight
-    }
-    
-    const handleTouchEnd = () => {
-       setIsResizing(false)
-       
-       if (content) {
-           content.style.display = ''
-       }
-       
-       window.dispatchEvent(new CustomEvent('panel-resize-end'))
-       document.removeEventListener('touchmove', handleTouchMove)
-       document.removeEventListener('touchend', handleTouchEnd)
-       // Mobile 不一定需要保存到底部高度设置，或者也可以保存
-       layoutStore.setBottomPanelHeight(currentHeightRef.current)
-    }
-
-    document.addEventListener('touchmove', handleTouchMove, { passive: false })
-    document.addEventListener('touchend', handleTouchEnd)
-  }, [])
 
   // 渲染内容
   const renderContent = useCallback((activeTab: PanelTab | null) => {
@@ -243,7 +119,7 @@ export const BottomPanel = memo(function BottomPanel({ directory }: BottomPanelP
             directory={directory ?? ''}
             previewFile={previewFile}
             position="bottom"
-            isPanelResizing={isResizing}
+            isPanelResizing={false} // Panel resizing is handled by ResizablePanel
           />
         )
       case 'changes':
@@ -254,80 +130,28 @@ export const BottomPanel = memo(function BottomPanel({ directory }: BottomPanelP
             </div>
           )
         }
-        return <SessionChangesPanel sessionId={sessionId} isResizing={isResizing} />
+        return <SessionChangesPanel sessionId={sessionId} isResizing={false} />
       default:
         return null
     }
-  }, [isRestoring, handleNewTerminal, directory, previewFile, sessionId, isResizing])
+  }, [isRestoring, handleNewTerminal, directory, previewFile, sessionId])
 
   return (
-    <>
-      {/* Mobile Overlay */}
-      {isMobile && (
-        <div 
-          className={`mobile-overlay-backdrop transition-opacity duration-300 ease-out ${bottomPanelOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-          onClick={() => layoutStore.closeBottomPanel()}
-        />
-      )}
-
-      <div 
-        ref={panelRef}
-        className={`
-          flex flex-col bg-bg-100 
-          ${isMobile 
-            ? `fixed bottom-0 left-0 right-0 z-[100] h-[40vh] shadow-2xl rounded-t-xl overflow-hidden border-t border-border-200 transition-transform duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${bottomPanelOpen ? 'translate-y-0' : 'translate-y-full'}` 
-            : `relative ${isResizing ? 'transition-none' : 'transition-[height] duration-200 ease-out'}`
-          }
-        `}
-        style={!isMobile ? { 
-          '--panel-height': `${bottomPanelHeight}px`,
-          height: bottomPanelOpen ? 'var(--panel-height)' : 0 
-        } as React.CSSProperties : undefined}
+    <ResizablePanel
+      position="bottom"
+      isOpen={bottomPanelOpen}
+      size={bottomPanelHeight}
+      onSizeChange={layoutStore.setBottomPanelHeight}
+      onClose={layoutStore.closeBottomPanel}
+    >
+      <PanelContainer
+        position="bottom"
+        onNewTerminal={handleNewTerminal}
+        onCloseTerminal={handleCloseTerminal}
       >
-        {/* Resize Handle - PC Only */}
-        {!isMobile && (
-          <div
-            className={`
-              absolute top-0 left-0 right-0 h-2 cursor-row-resize z-50
-              hover:bg-accent-main-100/30 active:bg-accent-main-100/50 transition-colors -translate-y-1/2
-              ${isResizing ? 'bg-accent-main-100/50' : 'bg-transparent'}
-            `}
-            onMouseDown={handleResizeStart}
-          />
-        )}
-        
-        {/* Resize Handle - Mobile Only (Handle Bar) */}
-        {isMobile && (
-          <div 
-            className="w-full flex items-center justify-center pt-2 pb-1 cursor-ns-resize touch-none bg-bg-100"
-            onTouchStart={handleTouchResizeStart}
-          >
-             {/* Visual Indicator */}
-             <div className="w-10 h-1 rounded-full bg-border-300 opacity-50" />
-          </div>
-        )}
-
-        {/* Resize 时的遮罩层 (PC) */}
-        {!isMobile && isResizing && (
-          <div className="absolute inset-0 z-40 bg-transparent pointer-events-auto" />
-        )}
-        
-        {/* Top Border (PC) */}
-        {!isMobile && <div className="h-px bg-border-200/50 shrink-0" />}
-
-        {/* Content Container */}
-        <div ref={contentRef} className="flex-1 flex flex-col min-h-0">
-          {/* Panel Container with Tabs */}
-          <PanelContainer
-            position="bottom"
-            onNewTerminal={handleNewTerminal}
-            onCloseTerminal={handleCloseTerminal}
-          >
-            {renderContent}
-          </PanelContainer>
-        </div>
-      </div>
-    </>
+        {renderContent}
+      </PanelContainer>
+    </ResizablePanel>
   )
 })
 
