@@ -5,7 +5,6 @@ import { useDirectory } from '../../../hooks'
 import { useSessionContext } from '../../../contexts/SessionContext'
 import { updateSession, subscribeToConnectionState, type ApiSession, type ConnectionInfo } from '../../../api'
 import { uiErrorHandler } from '../../../utils'
-import { PlusIcon } from '../../../components/Icons'
 
 interface SidePanelProps {
   onNewSession: () => void
@@ -106,10 +105,10 @@ export function SidePanel({
 
   return (
     <div className="flex flex-col h-full overflow-hidden border-r border-border-200/30">
-      {/* Top Section: Project & New Chat */}
-      <div className="flex flex-col gap-2 p-3 flex-shrink-0">
+      {/* Top Section: Project Selector Header */}
+      <div className="h-14 flex items-center px-3 z-20 border-b border-border-200/30 relative shrink-0">
         {/* Project Switcher */}
-        <div className="relative z-20">
+        <div className="w-full relative z-20">
           <ProjectSelector
             currentProject={currentProject as any}
             projects={projects as any}
@@ -119,27 +118,10 @@ export function SidePanel({
             onRemoveProject={handleRemoveProject}
           />
         </div>
-
-        {/* New Chat Button */}
-        <button
-          onClick={onNewSession}
-          className="relative group w-full flex items-center justify-between px-3 py-2 bg-bg-200/40 hover:bg-bg-200/80 text-text-200 rounded-lg transition-all duration-200"
-        >
-          <div className="flex items-center gap-2.5">
-            <PlusIcon className="w-4 h-4 text-text-400 group-hover:text-text-100 transition-colors" />
-            <span className="text-sm font-medium">New Chat</span>
-          </div>
-          <span className="text-[10px] font-mono text-text-400 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 bg-bg-000/50 px-1.5 py-0.5 rounded">
-            Ctrl+N
-          </span>
-        </button>
       </div>
 
-      {/* Divider - Subtle fade */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border-200/50 to-transparent mx-4 mb-2 flex-shrink-0" />
-
       {/* List */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden pt-2">
         <SessionList
           sessions={sessions}
           selectedId={selectedSessionId}

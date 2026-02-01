@@ -184,12 +184,12 @@ export const PanelContainer = memo(function PanelContainer({
   return (
     <>
       {/* Header with Tabs */}
-      <div className="flex items-center justify-between px-1 py-1 shrink-0 border-b border-border-200/30 h-10">
+      <div className="flex items-center justify-between px-3 z-20 bg-bg-100 border-b border-border-200/30 h-14 relative shrink-0">
         {/* Tabs Container - 水平滚动 */}
         <div 
           ref={tabsContainerRef} 
           onWheel={handleWheel}
-          className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto scrollbar-none px-1"
+          className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto scrollbar-none"
         >
           {tabs.map((tab) => (
             <PanelTabButton
@@ -220,7 +220,7 @@ export const PanelContainer = memo(function PanelContainer({
                 }
               }}
               className={`
-                p-1.5 ml-0.5 rounded-md transition-colors shrink-0
+                p-2 ml-1 rounded-md transition-colors shrink-0
                 ${addMenuPos 
                   ? 'bg-bg-200 text-text-100' 
                   : 'text-text-400 hover:text-text-100 hover:bg-bg-200/50'
@@ -234,15 +234,17 @@ export const PanelContainer = memo(function PanelContainer({
         </div>
         
         {/* Actions */}
-        <div className="flex items-center gap-0.5 shrink-0 ml-1 border-l border-border-200/30 pl-1">
+        <div className="flex items-center gap-1 shrink-0 ml-2 border-l border-border-200/30 pl-2">
           <button
             onClick={handleCollapse}
-            className="p-1.5 text-text-400 hover:text-text-100 hover:bg-bg-200/50 rounded-md transition-colors"
+            className="p-2 text-text-400 hover:text-text-100 hover:bg-bg-200/50 rounded-md transition-colors"
             title="Hide Panel"
           >
-            {position === 'bottom' ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+            {position === 'bottom' ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
           </button>
         </div>
+
+        {/* Smooth gradient transition to content - REMOVED */}
       </div>
 
       {/* Content */}
