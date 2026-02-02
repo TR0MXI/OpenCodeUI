@@ -4,7 +4,10 @@
 
 import { get, post, del } from './http'
 import { formatPathForApi } from '../utils/directoryUtils'
-import type { MCPStatusResponse, MCPResource } from '../types/api/mcp'
+import type { 
+  MCPStatusResponse, 
+  McpServerConfig,
+} from '../types/api/mcp'
 
 /**
  * 获取所有 MCP 服务器状态
@@ -18,49 +21,54 @@ export async function getMcpStatus(directory?: string): Promise<MCPStatusRespons
  */
 export async function addMcpServer(
   name: string,
-  config: {
-    type: 'local' | 'oauth' | 'remote'
-    command?: string
-    args?: string[]
-    url?: string
-    env?: Record<string, string>
-  },
+  config: McpServerConfig,
   directory?: string
 ): Promise<void> {
-  return post<void>('/mcp', { directory: formatPathForApi(directory) }, { name, ...config })
+  return post<void>('/mcp', { directory: formatPathForApi(directory) }, { name, config })
 }
 
 /**
  * 连接到 MCP 服务器
  */
 export async function connectMcpServer(name: string, directory?: string): Promise<void> {
-  return post<void>(`/mcp/${name}/connect`, { directory: formatPathForApi(directory) })
+  return post<void>(`/mcp/${encodeURIComponent(name)}/connect`, { directory: formatPathForApi(directory) })
 }
 
 /**
  * 断开 MCP 服务器连接
  */
 export async function disconnectMcpServer(name: string, directory?: string): Promise<void> {
-  return post<void>(`/mcp/${name}/disconnect`, { directory: formatPathForApi(directory) })
+  return post<void>(`/mcp/${encodeURIComponent(name)}/disconnect`, { directory: formatPathForApi(directory) })
 }
 
 /**
  * 开始 MCP 认证流程
  */
 export async function startMcpAuth(name: string, directory?: string): Promise<{ url: string }> {
-  return post<{ url: string }>(`/mcp/${name}/auth`, { directory: formatPathForApi(directory) })
+  return post<{ url: string }>(`/mcp/${encodeURIComponent(name)}/auth`, { directory: formatPathForApi(directory) })
 }
 
 /**
  * 移除 MCP 认证
  */
 export async function removeMcpAuth(name: string, directory?: string): Promise<void> {
-  return del<void>(`/mcp/${name}/auth`, { directory: formatPathForApi(directory) })
+  return del<void>(`/mcp/${encodeURIComponent(name)}/auth`, { directory: formatPathForApi(directory) })
 }
 
 /**
- * 获取 MCP 资源列表
+ * 完成 MCP OAuth 认证（使用授权码）
  */
-export async function getMcpResources(directory?: string): Promise<MCPResource[]> {
-  return get<MCPResource[]>('/experimental/resource', { directory: formatPathForApi(directory) })
+export async function completeMcpAuth(name: string, code: string, directory?: string): Promise<void> {
+  return post<void>(
+    `/mcp/${encodeURIComponent(name)}/auth/callback`, 
+    { directory: formatPathForApi(directory) },
+    { code }
+  )
+}
+
+/**
+ * 启动完整的 OAuth 认证流程（打开浏览器并等待回调）
+ */
+export async function authenticateMcp(name: string, directory?: string): Promise<void> {
+  return post<void>(`/mcp/${encodeURIComponent(name)}/auth/authenticate`, { directory: formatPathForApi(directory) })
 }

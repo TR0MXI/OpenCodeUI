@@ -534,4 +534,42 @@ export const GitDiffIcon = (props: IconProps) => (
   </DefaultIcon>
 )
 
+export const PlugIcon = (props: IconProps) => (
+  <DefaultIcon {...props}>
+    <path d="M12 22v-5" />
+    <path d="M9 8V2" />
+    <path d="M15 8V2" />
+    <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
+  </DefaultIcon>
+)
+
+export const KeyIcon = (props: IconProps) => (
+  <DefaultIcon {...props}>
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="m21 2-9.3 9.3" />
+    <path d="M17 6h4v-4" />
+  </DefaultIcon>
+)
+
+export const WifiIcon = (props: IconProps) => (
+  <DefaultIcon {...props}>
+    <path d="M5 13a10 10 0 0 1 14 0" />
+    <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+    <path d="M2 8.82a15 15 0 0 1 20 0" />
+    <line x1="12" y1="20" x2="12.01" y2="20" />
+  </DefaultIcon>
+)
+
+export const WifiOffIcon = (props: IconProps) => (
+  <DefaultIcon {...props}>
+    <path d="M12 20h.01" />
+    <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+    <path d="M2 8.82a15 15 0 0 1 4.17-2.65" />
+    <path d="M10.66 5c4.01-.36 8.14.9 11.34 3.76" />
+    <path d="M16.85 11.25a10 10 0 0 1 2.22 1.68" />
+    <path d="M5 13a10 10 0 0 1 5.24-2.76" />
+    <line x1="2" y1="2" x2="22" y2="22" />
+  </DefaultIcon>
+)
+
 

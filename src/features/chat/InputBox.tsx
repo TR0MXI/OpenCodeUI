@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { AttachmentPreview, type Attachment } from '../attachment'
-import { MentionMenu, detectMentionTrigger, MENTION_COLORS, type MentionMenuHandle, type MentionItem } from '../mention'
+import { MentionMenu, detectMentionTrigger, type MentionMenuHandle, type MentionItem } from '../mention'
 import { SlashCommandMenu, type SlashCommandMenuHandle } from '../slash-command'
 import { InputToolbar } from './input/InputToolbar'
 import { UndoStatus } from './input/UndoStatus'
@@ -10,16 +10,6 @@ import type { Command } from '../../api/command'
 // ============================================
 // Types
 // ============================================
-
-/** Token 类型：普通文本或 mention/command */
-type TokenType = 'text' | 'mention-file' | 'mention-folder' | 'mention-agent' | 'mention-command'
-
-/** 解析后的 token */
-interface Token {
-  type: TokenType
-  content: string
-  attachmentId?: string  // 关联的 attachment id
-}
 
 export interface InputBoxProps {
   onSend: (text: string, attachments: Attachment[], options?: { agent?: string; variant?: string }) => void
@@ -626,42 +616,24 @@ export function InputBox({
                   </div>
                 </div>
 
-                {/* Text Input - textarea with highlight overlay */}
+                {/* Text Input - 简单的 textarea，直接显示文本 */}
                 <div className="px-4 pt-4 pb-2">
-                  <div className="relative w-full">
-                    {/* Highlight overlay - 渲染在 textarea 下方，显示染色文本 */}
-                    <TextHighlightOverlay 
-                      text={text}
-                      attachments={attachments}
-                      scrollRef={textareaRef}
-                    />
-                    {/* Textarea - 主体，文字透明，只显示光标 */}
-                    <textarea
-                      ref={textareaRef}
-                      value={text}
-                      onChange={handleChange}
-                      onKeyDown={handleKeyDown}
-                      onPaste={handlePaste}
-                      onScroll={handleScroll}
-                      placeholder="Reply to Agent (type @ to mention)"
-                      className="w-full resize-none focus:outline-none focus:ring-0 bg-transparent placeholder:text-text-400 custom-scrollbar"
-                      style={{ 
-                        ...SHARED_TEXT_STYLE,
-                        display: 'block',
-                        minHeight: '24px', 
-                        maxHeight: '50vh',
-                        color: 'transparent',
-                        caretColor: 'hsl(var(--text-100))',
-                        position: 'relative',
-                        zIndex: 2,
-                        // 确保没有浏览器默认样式干扰
-                        WebkitAppearance: 'none',
-                        outline: 'none',
-                        resize: 'none',
-                      }}
-                      rows={1}
-                    />
-                  </div>
+                  <textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
+                    onScroll={handleScroll}
+                    placeholder="Reply to Agent (type @ to mention)"
+                    className="w-full resize-none focus:outline-none focus:ring-0 bg-transparent text-text-100 placeholder:text-text-400 custom-scrollbar"
+                    style={{ 
+                      ...TEXT_STYLE,
+                      minHeight: '24px', 
+                      maxHeight: '50vh',
+                    }}
+                    rows={1}
+                  />
                 </div>
 
                 {/* Bottom Bar -> InputToolbar */}
@@ -696,175 +668,18 @@ export function InputBox({
 }
 
 // ============================================
-// TextHighlightOverlay - 在 textarea 上渲染高亮文本
+// 文本样式常量
 // ============================================
 
-/** 
- * Overlay 和 textarea 共享的文本样式
- * 必须完全一致才能让光标位置正确对齐
- * 
- * 关键点：
- * 1. 使用完全相同的 font 属性
- * 2. 使用 inherit 继承，避免浏览器差异
- * 3. 避免任何可能影响布局的属性差异
- */
-const SHARED_TEXT_STYLE: React.CSSProperties = {
-  // 字体 - 使用系统 UI 字体栈
+const TEXT_STYLE: React.CSSProperties = {
   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   fontSize: '14px',
   fontWeight: 400,
   lineHeight: '20px',
-  letterSpacing: '0px',
-  wordSpacing: '0px',
-  
-  // 文本换行行为
+  letterSpacing: 'normal',
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
   overflowWrap: 'break-word',
-  
-  // 盒模型
-  padding: 0,
-  margin: 0,
-  border: 'none',
-  boxSizing: 'border-box',
-  
-  // 文本渲染
-  textRendering: 'auto',
-  WebkitFontSmoothing: 'antialiased',
-  
-  // 禁用字体特性变化
-  fontKerning: 'auto',
-  fontFeatureSettings: 'normal',
-  fontVariantLigatures: 'normal',
-  textSizeAdjust: '100%',
-}
-
-interface TextHighlightOverlayProps {
-  text: string
-  attachments: Attachment[]
-  scrollRef: React.RefObject<HTMLTextAreaElement | null>
-}
-
-function TextHighlightOverlay({ text, attachments, scrollRef }: TextHighlightOverlayProps) {
-  const overlayRef = useRef<HTMLDivElement>(null)
-  
-  // 同步滚动和尺寸 - 使用 RAF 确保同步
-  useEffect(() => {
-    const textarea = scrollRef.current
-    const overlay = overlayRef.current
-    if (!textarea || !overlay) return
-    
-    let rafId: number | null = null
-    
-    const sync = () => {
-      if (!textarea || !overlay) return
-      
-      // 同步滚动位置
-      overlay.scrollTop = textarea.scrollTop
-      overlay.scrollLeft = textarea.scrollLeft
-      
-      // 同步尺寸 - 使用实际计算值而不是 style
-      const rect = textarea.getBoundingClientRect()
-      overlay.style.width = `${rect.width}px`
-      overlay.style.height = `${rect.height}px`
-    }
-    
-    const scheduleSync = () => {
-      if (rafId) cancelAnimationFrame(rafId)
-      rafId = requestAnimationFrame(sync)
-    }
-    
-    // 监听滚动
-    textarea.addEventListener('scroll', scheduleSync, { passive: true })
-    
-    // 监听输入（内容变化会改变高度）
-    textarea.addEventListener('input', scheduleSync)
-    
-    // 使用 ResizeObserver 监听尺寸变化
-    const resizeObserver = new ResizeObserver(scheduleSync)
-    resizeObserver.observe(textarea)
-    
-    // 初始同步
-    sync()
-    
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId)
-      textarea.removeEventListener('scroll', scheduleSync)
-      textarea.removeEventListener('input', scheduleSync)
-      resizeObserver.disconnect()
-    }
-  }, [scrollRef])
-
-  // 将文本分割为 token（普通文本 + mention 高亮）
-  const tokens = useMemo(() => tokenize(text, attachments), [text, attachments])
-
-  // 共享的 overlay 样式
-  const overlayStyle: React.CSSProperties = {
-    ...SHARED_TEXT_STYLE,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 1,
-    pointerEvents: 'none',
-    overflow: 'hidden',
-    // 初始尺寸，会被 JS 同步覆盖
-    minHeight: '24px',
-  }
-
-  // 没有 mention 时直接渲染纯文本（性能优化）
-  if (attachments.filter(a => a.textRange).length === 0) {
-    return (
-      <div
-        ref={overlayRef}
-        className="text-text-100"
-        style={overlayStyle}
-        aria-hidden
-      >
-        {text || '\u00A0'}
-      </div>
-    )
-  }
-
-  return (
-    <div
-      ref={overlayRef}
-      style={overlayStyle}
-      aria-hidden
-    >
-      {tokens.map((token, i) => {
-        if (token.type === 'text') {
-          return <span key={i} className="text-text-100">{token.content || '\u00A0'}</span>
-        }
-        
-        // Command token - 使用紫色，不加额外 padding 避免偏移
-        if (token.type === 'mention-command') {
-          return (
-            <span 
-              key={i} 
-              className="text-purple-600 dark:text-purple-400"
-              style={{ backgroundColor: 'rgba(168, 85, 247, 0.1)' }}
-            >
-              {token.content}
-            </span>
-          )
-        }
-        
-        // Mention token — 用对应类型的颜色，不加额外 padding
-        const colorKey = token.type === 'mention-agent' ? 'agent' 
-          : token.type === 'mention-folder' ? 'folder' 
-          : 'file'
-        const colors = MENTION_COLORS[colorKey]
-        return (
-          <span 
-            key={i} 
-            className={`${colors.bg} ${colors.text} ${colors.darkText}`}
-          >
-            {token.content}
-          </span>
-        )
-      })}
-    </div>
-  )
 }
 
 // ============================================
@@ -885,56 +700,4 @@ function detectSlashTrigger(text: string, cursorPos: number): { query: string; s
   }
   
   return { query, startIndex: 0 }
-}
-
-// ============================================
-// tokenize - 将文本按 attachment 的 textRange 分割
-// ============================================
-
-function tokenize(text: string, attachments: Attachment[]): Token[] {
-  // 收集有 textRange 的 mention attachments，按 start 排序
-  const mentions = attachments
-    .filter(a => a.textRange)
-    .map(a => ({
-      start: a.textRange!.start,
-      end: a.textRange!.end,
-      value: a.textRange!.value,
-      type: a.type,
-      id: a.id,
-    }))
-    .sort((a, b) => a.start - b.start)
-
-  if (mentions.length === 0) {
-    return [{ type: 'text', content: text }]
-  }
-
-  const tokens: Token[] = []
-  let lastIndex = 0
-
-  for (const m of mentions) {
-    // 验证 mention 在文本中仍然匹配
-    const actual = text.slice(m.start, m.end)
-    if (actual !== m.value) continue  // 不匹配，跳过
-
-    // 前面的普通文本
-    if (m.start > lastIndex) {
-      tokens.push({ type: 'text', content: text.slice(lastIndex, m.start) })
-    }
-
-    // mention/command token
-    const tokenType: TokenType = m.type === 'agent' ? 'mention-agent'
-      : m.type === 'folder' ? 'mention-folder'
-      : m.type === 'command' ? 'mention-command'
-      : 'mention-file'
-    tokens.push({ type: tokenType, content: m.value, attachmentId: m.id })
-
-    lastIndex = m.end
-  }
-
-  // 剩余文本
-  if (lastIndex < text.length) {
-    tokens.push({ type: 'text', content: text.slice(lastIndex) })
-  }
-
-  return tokens
 }

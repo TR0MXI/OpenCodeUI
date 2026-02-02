@@ -6,6 +6,7 @@ import { layoutStore, useLayoutStore, type TerminalTab, type PanelTab } from '..
 import { createPtySession, removePtySession, listPtySessions } from '../api/pty'
 import { SessionChangesPanel } from './SessionChangesPanel'
 import { FileExplorer } from './FileExplorer'
+import { McpPanel } from './McpPanel'
 import { useMessageStore } from '../store'
 import { ResizablePanel } from './ui/ResizablePanel'
 
@@ -144,6 +145,8 @@ export const BottomPanel = memo(function BottomPanel({ directory }: BottomPanelP
           )
         }
         return <SessionChangesPanel sessionId={sessionId} isResizing={isPanelResizing} />
+      case 'mcp':
+        return <McpPanel isResizing={isPanelResizing} />
       default:
         return null
     }

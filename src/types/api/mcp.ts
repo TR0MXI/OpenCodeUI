@@ -7,24 +7,21 @@
  * MCP 已连接状态
  */
 export interface MCPStatusConnected {
-  type: 'connected'
-  tools: string[]
-  resources: string[]
-  prompts: string[]
+  status: 'connected'
 }
 
 /**
  * MCP 已禁用状态
  */
 export interface MCPStatusDisabled {
-  type: 'disabled'
+  status: 'disabled'
 }
 
 /**
  * MCP 失败状态
  */
 export interface MCPStatusFailed {
-  type: 'failed'
+  status: 'failed'
   error: string
 }
 
@@ -32,16 +29,15 @@ export interface MCPStatusFailed {
  * MCP 需要认证状态
  */
 export interface MCPStatusNeedsAuth {
-  type: 'needs_auth'
-  url: string
+  status: 'needs_auth'
 }
 
 /**
  * MCP 需要客户端注册状态
  */
 export interface MCPStatusNeedsClientRegistration {
-  type: 'needs_client_registration'
-  url: string
+  status: 'needs_client_registration'
+  error: string
 }
 
 /**
@@ -58,11 +54,11 @@ export type MCPStatus =
  * MCP 资源
  */
 export interface MCPResource {
-  server: string
   name: string
   uri: string
   description?: string
   mimeType?: string
+  client: string  // server name
 }
 
 /**
@@ -71,3 +67,40 @@ export interface MCPResource {
 export interface MCPStatusResponse {
   [serverName: string]: MCPStatus
 }
+
+/**
+ * MCP 本地配置
+ */
+export interface McpLocalConfig {
+  type: 'local'
+  command: string[]
+  environment?: Record<string, string>
+  enabled?: boolean
+  timeout?: number
+}
+
+/**
+ * MCP OAuth 配置
+ */
+export interface McpOAuthConfig {
+  clientId?: string
+  clientSecret?: string
+  scope?: string
+}
+
+/**
+ * MCP 远程配置
+ */
+export interface McpRemoteConfig {
+  type: 'remote'
+  url: string
+  enabled?: boolean
+  headers?: Record<string, string>
+  oauth?: McpOAuthConfig | false
+  timeout?: number
+}
+
+/**
+ * MCP 服务器配置（本地或远程）
+ */
+export type McpServerConfig = McpLocalConfig | McpRemoteConfig

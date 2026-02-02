@@ -12,6 +12,7 @@ import {
   TerminalIcon,
   FolderIcon,
   GitCommitIcon,
+  PlugIcon,
 } from './Icons'
 import { 
   layoutStore, 
@@ -37,6 +38,7 @@ const TAB_ICONS: Record<PanelTabType, React.ReactNode> = {
   terminal: <TerminalIcon size={12} />,
   files: <FolderIcon size={12} />,
   changes: <GitCommitIcon size={12} />,
+  mcp: <PlugIcon size={12} />,
 }
 
 // Tab 显示名称
@@ -44,7 +46,12 @@ function getTabLabel(tab: PanelTab): string {
   if (tab.type === 'terminal') {
     return tab.title ?? 'Terminal'
   }
-  return tab.type === 'files' ? 'Files' : 'Changes'
+  switch (tab.type) {
+    case 'files': return 'Files'
+    case 'changes': return 'Changes'
+    case 'mcp': return 'MCP'
+    default: return 'Tab'
+  }
 }
 
 // ============================================
@@ -76,7 +83,7 @@ export const PanelContainer = memo(function PanelContainer({
   const tabsContainerRef = useRef<HTMLDivElement>(null)
   
   // Add 菜单状态
-  const [addMenuPos, setAddMenuPos] = useState<{ x: number; y: number } | null>(null)
+  const [addMenuPos, setAddMenuPos] = useState<{ x: number; y: number; align: 'left' | 'right' } | null>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const addButtonRef = useRef<HTMLButtonElement>(null)
   
@@ -216,7 +223,15 @@ export const PanelContainer = memo(function PanelContainer({
                   setAddMenuPos(null)
                 } else if (addButtonRef.current) {
                   const rect = addButtonRef.current.getBoundingClientRect()
-                  setAddMenuPos({ x: rect.left, y: rect.bottom + 4 })
+                  const viewportWidth = window.innerWidth
+                  // 如果右侧空间不足（预留 160px），则靠右对齐
+                  const align = (rect.left + 160 > viewportWidth) ? 'right' : 'left'
+                  
+                  setAddMenuPos({ 
+                    x: align === 'left' ? rect.left : rect.right, 
+                    y: rect.bottom + 4,
+                    align
+                  })
                 }
               }}
               className={`
@@ -274,7 +289,11 @@ export const PanelContainer = memo(function PanelContainer({
         <div
           ref={addMenuRef}
           className="fixed z-[9999] bg-bg-100 border border-border-200 rounded-lg shadow-xl py-1 min-w-[140px]"
-          style={{ left: addMenuPos.x, top: addMenuPos.y }}
+          style={{ 
+            top: addMenuPos.y,
+            left: addMenuPos.align === 'left' ? addMenuPos.x : undefined,
+            right: addMenuPos.align === 'right' ? (window.innerWidth - addMenuPos.x) : undefined,
+          }}
         >
           <button
             onClick={() => {
@@ -311,6 +330,18 @@ export const PanelContainer = memo(function PanelContainer({
               <GitCommitIcon size={12} />
             </span>
             Changes
+          </button>
+          <button
+            onClick={() => {
+              layoutStore.addMcpTab(position)
+              setAddMenuPos(null)
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-text-200 hover:bg-bg-200 hover:text-text-100 transition-colors"
+          >
+            <span className="opacity-60 shrink-0">
+              <PlugIcon size={12} />
+            </span>
+            MCP Servers
           </button>
         </div>,
         document.body

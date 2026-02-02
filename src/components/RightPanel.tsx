@@ -4,6 +4,7 @@ import { PanelContainer } from './PanelContainer'
 import { SessionChangesPanel } from './SessionChangesPanel'
 import { FileExplorer } from './FileExplorer'
 import { Terminal } from './Terminal'
+import { McpPanel } from './McpPanel'
 import { useMessageStore } from '../store'
 import { useDirectory } from '../hooks'
 import { createPtySession, removePtySession } from '../api/pty'
@@ -90,6 +91,8 @@ export const RightPanel = memo(function RightPanel() {
             directory={currentDirectory}
           />
         )
+      case 'mcp':
+        return <McpPanel isResizing={isPanelResizing} />
       default:
         return null
     }

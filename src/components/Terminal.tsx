@@ -7,7 +7,6 @@ import { useEffect, useRef, memo, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { getPtyConnectUrl, updatePtySession } from '../api/pty'
 import { layoutStore } from '../store/layoutStore'
@@ -40,13 +39,13 @@ function getHSLColor(varName: string): string {
 }
 
 function getTerminalTheme(isDark: boolean) {
-  // 从 CSS 变量获取背景色，与面板完全一致
-  const bgColor = getHSLColor('--bg-100') || (isDark ? '#262422' : '#f5f2ed')
   const fgColor = getHSLColor('--text-100') || (isDark ? '#e8e0d5' : '#2d2a26')
   
+  // 背景色设置为透明，实际上由 CSS 强制覆盖，
+  // 但这里设置 transparent 可以让 xterm 内部逻辑知道它是透明的
   if (isDark) {
     return {
-      background: bgColor,
+      background: '#00000000', // 完全透明
       foreground: fgColor,
       cursor: '#e8e0d5',
       cursorAccent: '#1a1a1a',
@@ -73,7 +72,7 @@ function getTerminalTheme(isDark: boolean) {
     }
   } else {
     return {
-      background: bgColor,
+      background: '#00000000', // 完全透明
       foreground: fgColor,
       cursor: '#2d2a26',
       cursorAccent: '#f5f3ef',
@@ -108,6 +107,12 @@ function isDarkMode(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+// 检查是否为移动设备
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+}
+
 // ============================================
 // Terminal Component
 // ============================================
@@ -130,7 +135,6 @@ export const Terminal = memo(function Terminal({
   const resizeTimeoutRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
   const isPanelResizingRef = useRef(false)
-  // 追踪是否曾经变为活动状态（用于延迟连接 WebSocket）
   const [hasBeenActive, setHasBeenActive] = useState(isActive)
 
   // 当 tab 第一次变为活动状态时，标记它
@@ -140,29 +144,34 @@ export const Terminal = memo(function Terminal({
     }
   }, [isActive, hasBeenActive])
 
-  // 初始化终端 - 只在曾经活动过时才连接 WebSocket
+  // 初始化终端
   useEffect(() => {
     if (!containerRef.current) return
-    // 如果从未活动过，不初始化
     if (!hasBeenActive) return
     
-    // 标记组件已挂载
     mountedRef.current = true
     let ws: WebSocket | null = null
     let wsConnectTimeout: number | null = null
 
+    const isMobile = isMobileDevice()
     const theme = getTerminalTheme(isDarkMode())
     
     const terminal = new XTerm({
       theme,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-      fontSize: 13,
-      lineHeight: 1.2,
+      fontSize: isMobile ? 14 : 13,
+      lineHeight: isMobile ? 1.3 : 1.2,
       cursorBlink: true,
       cursorStyle: 'block',
       allowProposedApi: true,
       scrollback: 10000,
       convertEol: true,
+      allowTransparency: true, // 开启透明背景
+      ...(isMobile ? {
+        scrollSensitivity: 2,
+        macOptionIsMeta: true,
+        disableStdin: false,
+      } : {})
     })
 
     const fitAddon = new FitAddon()
@@ -173,19 +182,6 @@ export const Terminal = memo(function Terminal({
 
     terminal.open(containerRef.current)
     
-    // 尝试加载 WebGL 渲染器（大幅提升渲染性能）
-    try {
-      const webglAddon = new WebglAddon()
-      webglAddon.onContextLoss(() => {
-        webglAddon.dispose()
-      })
-      terminal.loadAddon(webglAddon)
-      console.log('[Terminal] WebGL renderer enabled')
-    } catch (e) {
-      console.warn('[Terminal] WebGL not available, using canvas renderer')
-    }
-    
-    // 初始 fit（使用 rAF 确保 DOM 已渲染）
     requestAnimationFrame(() => {
       if (mountedRef.current) {
         fitAddon.fit()
@@ -195,15 +191,10 @@ export const Terminal = memo(function Terminal({
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // 用 rAF 延迟连接 WebSocket（约16ms，比 setTimeout(100) 快6倍）
-    // 这足以跳过 StrictMode 的同步卸载，同时保持快速响应
+    // 连接 WebSocket
     const connectWs = () => {
-      if (!mountedRef.current) {
-        console.log('[Terminal] Skipping WS connect - unmounted')
-        return
-      }
+      if (!mountedRef.current) return
       
-      // 连接前先确保终端尺寸正确
       fitAddon.fit()
       
       const wsUrl = getPtyConnectUrl(ptyId, directory)
@@ -238,7 +229,6 @@ export const Terminal = memo(function Terminal({
         layoutStore.updateTerminalTab(ptyId, { status: 'disconnected' })
       }
 
-      // 终端输入发送到 WebSocket
       terminal.onData((data) => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(data)
@@ -248,7 +238,6 @@ export const Terminal = memo(function Terminal({
     
     wsConnectTimeout = requestAnimationFrame(connectWs) as unknown as number
 
-    // 监听标题变化
     terminal.onTitleChange((title) => {
       if (!mountedRef.current) return
       layoutStore.updateTerminalTab(ptyId, { title })
@@ -274,7 +263,6 @@ export const Terminal = memo(function Terminal({
     if (!isActive || !fitAddonRef.current || !terminalRef.current) return
 
     const handleResize = () => {
-      // 面板 resize 期间跳过
       if (isPanelResizingRef.current) return
       
       if (resizeTimeoutRef.current) {
@@ -284,28 +272,22 @@ export const Terminal = memo(function Terminal({
         if (fitAddonRef.current && terminalRef.current && !isPanelResizingRef.current) {
           fitAddonRef.current.fit()
           const { cols, rows } = terminalRef.current
-          // 通知后端调整 PTY 大小
           updatePtySession(ptyId, { size: { cols, rows } }, directory).catch(() => {})
         }
-      }, 16) // 约一帧时间，更跟手
+      }, 16)
     }
 
-    // 监听窗口大小变化
     window.addEventListener('resize', handleResize)
-    
-    // 使用 ResizeObserver 监听容器大小变化
     const resizeObserver = new ResizeObserver(handleResize)
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current)
     }
     
-    // 监听面板 resize 开始/结束
     const handlePanelResizeStart = () => {
       isPanelResizingRef.current = true
     }
     window.addEventListener('panel-resize-start', handlePanelResizeStart)
 
-    // 初始 fit
     handleResize()
 
     return () => {
@@ -326,7 +308,6 @@ export const Terminal = memo(function Terminal({
       }
     }
 
-    // 监听 data-mode 属性变化
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.attributeName === 'data-mode') {
@@ -345,7 +326,6 @@ export const Terminal = memo(function Terminal({
   useEffect(() => {
     if (isActive && terminalRef.current) {
       terminalRef.current.focus()
-      // 从隐藏变为可见时重新 fit（使用 rAF 确保布局完成）
       if (fitAddonRef.current) {
         requestAnimationFrame(() => {
           fitAddonRef.current?.fit()
@@ -354,15 +334,13 @@ export const Terminal = memo(function Terminal({
     }
   }, [isActive])
 
-  // 监听面板 resize 结束事件，重新 fit 终端
+  // 监听面板 resize 结束事件
   useEffect(() => {
     if (!isActive) return
     
     const handlePanelResizeEnd = () => {
       isPanelResizingRef.current = false
-      
       if (fitAddonRef.current && terminalRef.current) {
-        // 使用 rAF 确保在下一帧渲染后再 fit
         requestAnimationFrame(() => {
           if (!fitAddonRef.current || !terminalRef.current) return
           fitAddonRef.current.fit()
@@ -376,18 +354,46 @@ export const Terminal = memo(function Terminal({
     return () => window.removeEventListener('panel-resize-end', handlePanelResizeEnd)
   }, [isActive, ptyId, directory])
 
+  const isMobile = isMobileDevice()
+
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full"
-      style={{
-        padding: '4px 8px 8px 8px',
-        // 用 visibility + position 代替 display:none
-        // 这样保持容器尺寸，xterm fit 才能正常工作
-        visibility: isActive ? 'visible' : 'hidden',
-        position: isActive ? 'relative' : 'absolute',
-        pointerEvents: isActive ? 'auto' : 'none',
-      }}
-    />
+    <>
+      <style>{`
+        /* 强制隐藏 xterm 滚动条 */
+        .xterm-viewport::-webkit-scrollbar {
+          display: none;
+        }
+        /* 强制覆盖 xterm 内部元素的背景色为透明 */
+        .xterm-viewport, 
+        .xterm-screen, 
+        .xterm-scrollable-element {
+          background-color: transparent !important;
+        }
+        /* 确保终端本身无 padding */
+        .xterm {
+          padding: 0 !important;
+        }
+      `}</style>
+      <div
+        ref={containerRef}
+        className="h-full w-full bg-bg-100" // 统一使用主题背景色
+        style={{
+          padding: isMobile ? '0' : '4px 0 0 4px', // 极简 padding
+          visibility: isActive ? 'visible' : 'hidden',
+          position: isActive ? 'relative' : 'absolute',
+          pointerEvents: isActive ? 'auto' : 'none',
+        }}
+        onClick={() => {
+          if (isMobile && terminalRef.current) {
+            terminalRef.current.focus()
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (terminalRef.current && e.target === containerRef.current) {
+            terminalRef.current.focus()
+          }
+        }}
+      />
+    </>
   )
 })
