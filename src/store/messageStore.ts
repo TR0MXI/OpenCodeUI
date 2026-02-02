@@ -61,10 +61,15 @@ type Subscriber = () => void
 // Store Implementation
 // ============================================
 
+/** 最多缓存的 session 数量，超过时淘汰最久未访问的 */
+const MAX_CACHED_SESSIONS = 10
+
 class MessageStore {
   private sessions = new Map<string, SessionState>()
   private currentSessionId: string | null = null
   private subscribers = new Set<Subscriber>()
+  /** LRU 追踪：sessionId -> 最后访问时间 */
+  private sessionAccessTime = new Map<string, number>()
 
   // ============================================
   // Subscription
@@ -161,10 +166,17 @@ class MessageStore {
 
   /**
    * 初始化 session 状态（如果不存在）
+   * 包含 LRU 淘汰机制，防止内存无限增长
    */
   private ensureSession(sessionId: string): SessionState {
+    // 更新访问时间
+    this.sessionAccessTime.set(sessionId, Date.now())
+    
     let state = this.sessions.get(sessionId)
     if (!state) {
+      // 检查是否需要淘汰旧 session
+      this.evictOldSessions()
+      
       state = {
         messages: [],
         revertState: null,
@@ -178,6 +190,35 @@ class MessageStore {
       this.sessions.set(sessionId, state)
     }
     return state
+  }
+
+  /**
+   * LRU 淘汰：当 session 数量超过限制时，清除最久未访问的
+   */
+  private evictOldSessions() {
+    if (this.sessions.size < MAX_CACHED_SESSIONS) return
+    
+    // 找出最久未访问的 session（排除当前 session）
+    let oldestId: string | null = null
+    let oldestTime = Infinity
+    
+    for (const [id, time] of this.sessionAccessTime) {
+      // 不淘汰当前 session 和正在 streaming 的 session
+      if (id === this.currentSessionId) continue
+      const state = this.sessions.get(id)
+      if (state?.isStreaming) continue
+      
+      if (time < oldestTime) {
+        oldestTime = time
+        oldestId = id
+      }
+    }
+    
+    if (oldestId) {
+      console.log('[MessageStore] Evicting old session:', oldestId)
+      this.sessions.delete(oldestId)
+      this.sessionAccessTime.delete(oldestId)
+    }
   }
 
   /**
@@ -284,6 +325,7 @@ class MessageStore {
    */
   clearSession(sessionId: string) {
     this.sessions.delete(sessionId)
+    this.sessionAccessTime.delete(sessionId)
     this.notify()
   }
 

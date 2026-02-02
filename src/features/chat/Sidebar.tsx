@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, memo } from 'react'
 import { SidePanel } from './sidebar/SidePanel'
 import { ProjectDialog } from './ProjectDialog'
 import { useDirectory } from '../../hooks'
@@ -16,7 +16,7 @@ interface SidebarProps {
   onClose: () => void
 }
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   isOpen,
   selectedSessionId,
   onSelectSession,
@@ -161,4 +161,4 @@ export function Sidebar({
       />
     </>
   )
-}
+})

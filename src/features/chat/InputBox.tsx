@@ -411,27 +411,99 @@ export function InputBox({
     textareaRef.current?.focus()
   }, [])
 
-  // 图片上传
+  // 图片上传（带压缩）
   const handleImageUpload = useCallback((files: FileList | null) => {
     if (!files || !supportsImages) return
+    
+    const MAX_SIZE = 2048  // 最大边长
+    const MAX_FILE_SIZE = 5 * 1024 * 1024  // 5MB
+    const QUALITY = 0.85
     
     Array.from(files).forEach(file => {
       if (!file.type.startsWith('image/')) return
       
+      // 如果文件小于限制且不是很大的图片，直接用原图
+      if (file.size < 500 * 1024) {  // 小于500KB直接用
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string
+          const attachment: Attachment = {
+            id: crypto.randomUUID(),
+            type: 'file',
+            displayName: file.name,
+            url: dataUrl,
+            mime: file.type,
+          }
+          setAttachments(prev => [...prev, attachment])
+        }
+        reader.readAsDataURL(file)
+        return
+      }
+      
+      // 压缩大图片
+      const img = new Image()
+      const objectUrl = URL.createObjectURL(file)
+      
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl)
+        
+        let { width, height } = img
+        
+        // 计算缩放比例
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height)
+          width = Math.round(width * ratio)
+          height = Math.round(height * ratio)
+        }
+        
+        // 使用 Canvas 压缩
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        // 转换为 blob，然后检查大小
+        canvas.toBlob((blob) => {
+          if (!blob) return
+          
+          // 如果还是太大，降低质量重试
+          if (blob.size > MAX_FILE_SIZE) {
+            canvas.toBlob((smallerBlob) => {
+              if (!smallerBlob) return
+              blobToAttachment(smallerBlob, file.name)
+            }, 'image/jpeg', 0.6)
+          } else {
+            blobToAttachment(blob, file.name)
+          }
+        }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', QUALITY)
+      }
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        console.warn('[InputBox] Failed to load image for compression')
+      }
+      
+      img.src = objectUrl
+    })
+    
+    function blobToAttachment(blob: Blob, fileName: string) {
       const reader = new FileReader()
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string
         const attachment: Attachment = {
           id: crypto.randomUUID(),
           type: 'file',
-          displayName: file.name,
+          displayName: fileName,
           url: dataUrl,
-          mime: file.type,
+          mime: blob.type,
         }
         setAttachments(prev => [...prev, attachment])
       }
-      reader.readAsDataURL(file)
-    })
+      reader.readAsDataURL(blob)
+    }
   }, [supportsImages])
 
   // 删除附件

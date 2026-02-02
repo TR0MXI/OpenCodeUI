@@ -2,7 +2,7 @@
 // DirectoryContext - 管理当前工作目录
 // ============================================
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { getPath, type ApiPath } from '../api'
 import { useRouter } from '../hooks/useRouter'
 import { handleError, normalizeToForwardSlash, getDirectoryName, isSameDirectory } from '../utils'
@@ -107,17 +107,29 @@ export function DirectoryProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY_SIDEBAR, String(expanded))
   }, [])
 
+  // 稳定化 Provider value，避免每次渲染创建新对象导致子组件不必要重渲染
+  const value = useMemo<DirectoryContextValue>(() => ({
+    currentDirectory: urlDirectory,
+    setCurrentDirectory,
+    savedDirectories,
+    addDirectory,
+    removeDirectory,
+    pathInfo,
+    sidebarExpanded,
+    setSidebarExpanded,
+  }), [
+    urlDirectory,
+    setCurrentDirectory,
+    savedDirectories,
+    addDirectory,
+    removeDirectory,
+    pathInfo,
+    sidebarExpanded,
+    setSidebarExpanded,
+  ])
+
   return (
-    <DirectoryContext.Provider value={{
-      currentDirectory: urlDirectory,
-      setCurrentDirectory,
-      savedDirectories,
-      addDirectory,
-      removeDirectory,
-      pathInfo,
-      sidebarExpanded,
-      setSidebarExpanded,
-    }}>
+    <DirectoryContext.Provider value={value}>
       {children}
     </DirectoryContext.Provider>
   )

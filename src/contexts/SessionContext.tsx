@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react'
 import { 
   getSessions, 
   createSession as apiCreateSession, 
@@ -180,21 +180,35 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (currentSessionId === id) setCurrentSessionId(null)
   }, [currentSessionId, currentDirectory])
 
+  // 稳定化 Provider value，避免每次渲染创建新对象导致子组件不必要重渲染
+  const value = useMemo<SessionContextValue>(() => ({
+    sessions,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    search,
+    setSearch,
+    refresh,
+    loadMore,
+    createSession,
+    deleteSession,
+    currentSessionId,
+    setCurrentSessionId
+  }), [
+    sessions,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    search,
+    refresh,
+    loadMore,
+    createSession,
+    deleteSession,
+    currentSessionId,
+  ])
+
   return (
-    <SessionContext.Provider value={{
-      sessions,
-      isLoading,
-      isLoadingMore,
-      hasMore,
-      search,
-      setSearch,
-      refresh,
-      loadMore,
-      createSession,
-      deleteSession,
-      currentSessionId,
-      setCurrentSessionId
-    }}>
+    <SessionContext.Provider value={value}>
       {children}
     </SessionContext.Provider>
   )

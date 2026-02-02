@@ -56,7 +56,7 @@ interface UserMessageViewProps {
   canUndo?: boolean
 }
 
-function UserMessageView({ message, onUndo, canUndo }: UserMessageViewProps) {
+const UserMessageView = memo(function UserMessageView({ message, onUndo, canUndo }: UserMessageViewProps) {
   const { parts, info } = message
   const [showSystemContext, setShowSystemContext] = useState(false)
   
@@ -136,13 +136,13 @@ function UserMessageView({ message, onUndo, canUndo }: UserMessageViewProps) {
       </div>
     </div>
   )
-}
+})
 
 // ============================================
 // Assistant Message View
 // ============================================
 
-function AssistantMessageView({ message }: { message: Message }) {
+const AssistantMessageView = memo(function AssistantMessageView({ message }: { message: Message }) {
   const { parts, isStreaming, info } = message
   
   // 收集连续的 tool parts 合并渲染
@@ -241,7 +241,7 @@ function AssistantMessageView({ message }: { message: Message }) {
       )}
     </div>
   )
-}
+})
 
 // ============================================
 // Tool Group (连续的 tool parts)
@@ -252,7 +252,7 @@ interface ToolGroupProps {
   stepFinish?: StepFinishPart
 }
 
-function ToolGroup({ parts, stepFinish }: ToolGroupProps) {
+const ToolGroup = memo(function ToolGroup({ parts, stepFinish }: ToolGroupProps) {
   const [expanded, setExpanded] = useState(true)
   
   const doneCount = parts.filter(p => p.state.status === 'completed').length
@@ -303,7 +303,7 @@ function ToolGroup({ parts, stepFinish }: ToolGroupProps) {
       </div>
     </div>
   )
-}
+})
 
 // ============================================
 // Helpers

@@ -7,6 +7,7 @@ import { useEffect, useRef, memo, useState } from 'react'
 import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { WebglAddon } from '@xterm/addon-webgl'
 import '@xterm/xterm/css/xterm.css'
 import { getPtyConnectUrl, updatePtySession } from '../api/pty'
 import { layoutStore } from '../store/layoutStore'
@@ -172,18 +173,31 @@ export const Terminal = memo(function Terminal({
 
     terminal.open(containerRef.current)
     
-    // 初始 fit
-    setTimeout(() => {
+    // 尝试加载 WebGL 渲染器（大幅提升渲染性能）
+    try {
+      const webglAddon = new WebglAddon()
+      webglAddon.onContextLoss(() => {
+        webglAddon.dispose()
+      })
+      terminal.loadAddon(webglAddon)
+      console.log('[Terminal] WebGL renderer enabled')
+    } catch (e) {
+      console.warn('[Terminal] WebGL not available, using canvas renderer')
+    }
+    
+    // 初始 fit（使用 rAF 确保 DOM 已渲染）
+    requestAnimationFrame(() => {
       if (mountedRef.current) {
         fitAddon.fit()
       }
-    }, 0)
+    })
 
     terminalRef.current = terminal
     fitAddonRef.current = fitAddon
 
-    // 延迟连接 WebSocket，避免 StrictMode 双重挂载问题
-    wsConnectTimeout = window.setTimeout(() => {
+    // 用 rAF 延迟连接 WebSocket（约16ms，比 setTimeout(100) 快6倍）
+    // 这足以跳过 StrictMode 的同步卸载，同时保持快速响应
+    const connectWs = () => {
       if (!mountedRef.current) {
         console.log('[Terminal] Skipping WS connect - unmounted')
         return
@@ -201,8 +215,6 @@ export const Terminal = memo(function Terminal({
         console.log('[Terminal] WebSocket connected:', ptyId)
         if (!mountedRef.current) return
         layoutStore.updateTerminalTab(ptyId, { status: 'connected' })
-        // 再次 fit 确保尺寸正确，然后发送给后端
-        fitAddon.fit()
         const { cols, rows } = terminal
         console.log('[Terminal] Sending size:', cols, 'x', rows)
         updatePtySession(ptyId, { size: { cols, rows } }, directory).catch(() => {})
@@ -232,7 +244,9 @@ export const Terminal = memo(function Terminal({
           ws.send(data)
         }
       })
-    }, 100) // 100ms 延迟足以跳过 StrictMode 的快速卸载
+    }
+    
+    wsConnectTimeout = requestAnimationFrame(connectWs) as unknown as number
 
     // 监听标题变化
     terminal.onTitleChange((title) => {
@@ -243,7 +257,7 @@ export const Terminal = memo(function Terminal({
     return () => {
       mountedRef.current = false
       if (wsConnectTimeout) {
-        clearTimeout(wsConnectTimeout)
+        cancelAnimationFrame(wsConnectTimeout)
       }
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current)
@@ -273,7 +287,7 @@ export const Terminal = memo(function Terminal({
           // 通知后端调整 PTY 大小
           updatePtySession(ptyId, { size: { cols, rows } }, directory).catch(() => {})
         }
-      }, 50)
+      }, 16) // 约一帧时间，更跟手
     }
 
     // 监听窗口大小变化
@@ -331,11 +345,11 @@ export const Terminal = memo(function Terminal({
   useEffect(() => {
     if (isActive && terminalRef.current) {
       terminalRef.current.focus()
-      // 从隐藏变为可见时重新 fit
+      // 从隐藏变为可见时重新 fit（使用 rAF 确保布局完成）
       if (fitAddonRef.current) {
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           fitAddonRef.current?.fit()
-        }, 0)
+        })
       }
     }
   }, [isActive])
@@ -348,19 +362,12 @@ export const Terminal = memo(function Terminal({
       isPanelResizingRef.current = false
       
       if (fitAddonRef.current && terminalRef.current) {
-        // 多次 fit 确保尺寸正确（DOM reflow 可能需要时间）
-        const doFit = () => {
+        // 使用 rAF 确保在下一帧渲染后再 fit
+        requestAnimationFrame(() => {
           if (!fitAddonRef.current || !terminalRef.current) return
           fitAddonRef.current.fit()
           const { cols, rows } = terminalRef.current
           updatePtySession(ptyId, { size: { cols, rows } }, directory).catch(() => {})
-        }
-        
-        // 立即 fit 一次
-        requestAnimationFrame(() => {
-          doFit()
-          // 再延迟 fit 一次确保稳定
-          setTimeout(doFit, 100)
         })
       }
     }

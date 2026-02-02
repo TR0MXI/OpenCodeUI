@@ -106,7 +106,7 @@ export function SidePanel({
   return (
     <div className="flex flex-col h-full overflow-hidden border-r border-border-200/30">
       {/* Top Section: Project Selector Header */}
-      <div className="h-14 flex items-center px-3 z-20 border-b border-border-200/30 relative shrink-0">
+      <div className="h-14 flex items-center px-3 z-20 relative shrink-0">
         {/* Project Switcher */}
         <div className="w-full relative z-20">
           <ProjectSelector
