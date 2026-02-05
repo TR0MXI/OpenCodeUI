@@ -550,10 +550,11 @@ export function CodePreview({
   const lines = useMemo(() => code.split('\n'), [code])
   const totalHeight = lines.length * LINE_HEIGHT
   const containerStyle = useMemo(() => {
-    const naturalHeight = totalHeight + 16
-    const height = Math.max(minHeight, Math.min(naturalHeight, maxHeight))
+    const naturalHeight = totalHeight
+    const effectiveMinHeight = lines.length <= 2 ? naturalHeight : minHeight
+    const height = Math.min(maxHeight, Math.max(effectiveMinHeight, naturalHeight))
     return { height }
-  }, [totalHeight, minHeight, maxHeight])
+  }, [totalHeight, minHeight, maxHeight, lines.length])
   
   // text 类型不走高亮，resize 时也禁用以提高性能
   const enableHighlight = language !== 'text' && !isResizing

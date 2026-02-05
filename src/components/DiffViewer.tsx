@@ -166,10 +166,11 @@ const SplitDiffView = memo(function SplitDiffView({
   
   const totalHeight = pairedLines.length * LINE_HEIGHT
   const containerStyle = useMemo(() => {
-    const naturalHeight = totalHeight + 16
-    const height = Math.max(minHeight, Math.min(naturalHeight, maxHeight))
+    const naturalHeight = totalHeight
+    const effectiveMinHeight = pairedLines.length <= 2 ? naturalHeight : minHeight
+    const height = Math.min(maxHeight, Math.max(effectiveMinHeight, naturalHeight))
     return { height }
-  }, [totalHeight, minHeight, maxHeight])
+  }, [totalHeight, minHeight, maxHeight, pairedLines.length])
   
   // 可见范围
   const { startIndex, endIndex, offsetY } = useMemo(() => {
@@ -379,10 +380,11 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
   
   const totalHeight = lines.length * LINE_HEIGHT
   const containerStyle = useMemo(() => {
-    const naturalHeight = totalHeight + 16
-    const height = Math.max(minHeight, Math.min(naturalHeight, maxHeight))
+    const naturalHeight = totalHeight
+    const effectiveMinHeight = lines.length <= 2 ? naturalHeight : minHeight
+    const height = Math.min(maxHeight, Math.max(effectiveMinHeight, naturalHeight))
     return { height }
-  }, [totalHeight, minHeight, maxHeight])
+  }, [totalHeight, minHeight, maxHeight, lines.length])
   
   const { startIndex, endIndex, offsetY } = useMemo(() => {
     const start = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - OVERSCAN)
