@@ -22,6 +22,9 @@ const OVERSCAN = 5
 const LARGE_FILE_LINES = 2000
 const LARGE_FILE_CHARS = 300000
 
+// 自适应高度阈值 - 行数少于此值时不用虚拟滚动
+const AUTO_HEIGHT_THRESHOLD = 100
+
 // ============================================
 // Types
 // ============================================
@@ -36,6 +39,8 @@ export interface DiffViewerProps {
   /** 不传则填满父容器 */
   maxHeight?: number
   isResizing?: boolean
+  /** 自适应高度模式：内容少时自动撑开，多时限制高度 */
+  autoHeight?: boolean
 }
 
 export type LineType = 'add' | 'delete' | 'context' | 'empty'
@@ -85,10 +90,14 @@ export const DiffViewer = memo(function DiffViewer({
   viewMode = 'split',
   maxHeight,
   isResizing = false,
+  autoHeight = false,
 }: DiffViewerProps) {
   // 检测大文件
   const totalLines = before.split('\n').length + after.split('\n').length
   const isLargeFile = totalLines > LARGE_FILE_LINES || before.length + after.length > LARGE_FILE_CHARS
+  
+  // autoHeight 模式下，内容少时不用虚拟滚动
+  const useVirtualScroll = !autoHeight || totalLines > AUTO_HEIGHT_THRESHOLD
 
   if (viewMode === 'split') {
     return (
@@ -99,6 +108,7 @@ export const DiffViewer = memo(function DiffViewer({
         isResizing={isResizing}
         isLargeFile={isLargeFile}
         maxHeight={maxHeight}
+        useVirtualScroll={useVirtualScroll}
       />
     )
   }
@@ -109,6 +119,7 @@ export const DiffViewer = memo(function DiffViewer({
       language={language}
       isResizing={isResizing}
       maxHeight={maxHeight}
+      useVirtualScroll={useVirtualScroll}
     />
   )
 })
@@ -124,6 +135,7 @@ const SplitDiffView = memo(function SplitDiffView({
   isResizing,
   isLargeFile,
   maxHeight,
+  useVirtualScroll,
 }: { 
   before: string
   after: string
@@ -131,6 +143,7 @@ const SplitDiffView = memo(function SplitDiffView({
   isResizing: boolean
   isLargeFile: boolean
   maxHeight?: number
+  useVirtualScroll: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const leftPanelRef = useRef<HTMLDivElement>(null)
@@ -158,13 +171,16 @@ const SplitDiffView = memo(function SplitDiffView({
   
   const totalHeight = pairedLines.length * LINE_HEIGHT
   
-  // 可见范围
+  // 可见范围 - 不用虚拟滚动时渲染全部
   const { startIndex, endIndex, offsetY } = useMemo(() => {
+    if (!useVirtualScroll) {
+      return { startIndex: 0, endIndex: pairedLines.length, offsetY: 0 }
+    }
     const start = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - OVERSCAN)
     const visibleCount = Math.ceil(containerHeight / LINE_HEIGHT)
     const end = Math.min(pairedLines.length, start + visibleCount + OVERSCAN * 2)
     return { startIndex: start, endIndex: end, offsetY: start * LINE_HEIGHT }
-  }, [scrollTop, containerHeight, pairedLines.length])
+  }, [scrollTop, containerHeight, pairedLines.length, useVirtualScroll])
   
   // 监听容器大小
   useEffect(() => {
@@ -226,11 +242,11 @@ const SplitDiffView = memo(function SplitDiffView({
     const pair = pairedLines[i]
     
     leftRows.push(
-      <div key={i} className={`flex ${getLineBgClass(pair.left.type)}`} style={{ height: LINE_HEIGHT }}>
+      <div key={i} className={`flex min-w-full ${getLineBgClass(pair.left.type)}`} style={{ height: LINE_HEIGHT }}>
         <div className="w-10 shrink-0 px-1 text-right text-text-500 text-[11px] leading-5 select-none opacity-60">
           {pair.left.lineNo}
         </div>
-        <div className="px-2 leading-5 text-[11px] whitespace-pre">
+        <div className="flex-1 px-2 leading-5 text-[11px] whitespace-pre">
           {pair.left.type === 'delete' && <span className="text-danger-100 select-none mr-1">−</span>}
           {pair.left.type !== 'empty' && <LineContent line={pair.left} tokens={beforeTokens as any[][] | null} />}
         </div>
@@ -238,11 +254,11 @@ const SplitDiffView = memo(function SplitDiffView({
     )
     
     rightRows.push(
-      <div key={i} className={`flex ${getLineBgClass(pair.right.type)}`} style={{ height: LINE_HEIGHT }}>
+      <div key={i} className={`flex min-w-full ${getLineBgClass(pair.right.type)}`} style={{ height: LINE_HEIGHT }}>
         <div className="w-10 shrink-0 px-1 text-right text-text-500 text-[11px] leading-5 select-none opacity-60">
           {pair.right.lineNo}
         </div>
-        <div className="px-2 leading-5 text-[11px] whitespace-pre">
+        <div className="flex-1 px-2 leading-5 text-[11px] whitespace-pre">
           {pair.right.type === 'add' && <span className="text-success-100 select-none mr-1">+</span>}
           {pair.right.type !== 'empty' && <LineContent line={pair.right} tokens={afterTokens as any[][] | null} />}
         </div>
@@ -253,15 +269,15 @@ const SplitDiffView = memo(function SplitDiffView({
   return (
     <div 
       ref={containerRef}
-      className="h-full overflow-y-auto overflow-x-hidden panel-scrollbar-y font-mono"
+      className={`overflow-y-auto overflow-x-hidden custom-scrollbar font-mono ${useVirtualScroll ? 'h-full' : ''}`}
       style={maxHeight !== undefined ? { maxHeight } : undefined}
-      onScroll={handleScroll}
+      onScroll={useVirtualScroll ? handleScroll : undefined}
     >
-      {/* 虚拟滚动占位 */}
-      <div style={{ height: totalHeight, position: 'relative' }}>
+      {/* 虚拟滚动时用占位 + 绝对定位，否则直接渲染 */}
+      <div style={useVirtualScroll ? { height: totalHeight, position: 'relative' } : undefined}>
         <div 
-          className="absolute top-0 left-0 right-0 flex"
-          style={{ transform: `translateY(${offsetY}px)` }}
+          className={useVirtualScroll ? 'absolute top-0 left-0 right-0 flex' : 'flex'}
+          style={useVirtualScroll ? { transform: `translateY(${offsetY}px)` } : undefined}
         >
           {/* Left — 隐藏自身滚动条，由 proxy 控制 */}
           <div 
@@ -317,12 +333,14 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
   language,
   isResizing,
   maxHeight,
+  useVirtualScroll,
 }: { 
   before: string
   after: string
   language: string
   isResizing: boolean
   maxHeight?: number
+  useVirtualScroll: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -345,11 +363,14 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
   const totalHeight = lines.length * LINE_HEIGHT
   
   const { startIndex, endIndex, offsetY } = useMemo(() => {
+    if (!useVirtualScroll) {
+      return { startIndex: 0, endIndex: lines.length, offsetY: 0 }
+    }
     const start = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - OVERSCAN)
     const visibleCount = Math.ceil(containerHeight / LINE_HEIGHT)
     const end = Math.min(lines.length, start + visibleCount + OVERSCAN * 2)
     return { startIndex: start, endIndex: end, offsetY: start * LINE_HEIGHT }
-  }, [scrollTop, containerHeight, lines.length])
+  }, [scrollTop, containerHeight, lines.length, useVirtualScroll])
   
   useEffect(() => {
     const container = containerRef.current
@@ -383,14 +404,14 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
     }
     
     visibleRows.push(
-      <div key={i} className={`flex ${getLineBgClass(line.type)}`} style={{ height: LINE_HEIGHT }}>
+      <div key={i} className={`flex min-w-full ${getLineBgClass(line.type)}`} style={{ height: LINE_HEIGHT }}>
         <div className="w-10 shrink-0 px-1 text-right text-text-500 text-[11px] leading-5 select-none opacity-60">
           {line.oldLineNo}
         </div>
         <div className="w-10 shrink-0 px-1 text-right text-text-500 text-[11px] leading-5 select-none opacity-60">
           {line.newLineNo}
         </div>
-        <div className="px-2 leading-5 text-[11px] whitespace-pre">
+        <div className="flex-1 px-2 leading-5 text-[11px] whitespace-pre">
           {line.type === 'add' && <span className="text-success-100 select-none mr-1">+</span>}
           {line.type === 'delete' && <span className="text-danger-100 select-none mr-1">−</span>}
           <LineContent line={{ ...line, lineNo }} tokens={tokens} />
@@ -402,12 +423,12 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
   return (
     <div 
       ref={containerRef}
-      className="h-full overflow-auto panel-scrollbar font-mono"
+      className={`overflow-auto custom-scrollbar font-mono ${useVirtualScroll ? 'h-full' : ''}`}
       style={maxHeight !== undefined ? { maxHeight } : undefined}
-      onScroll={handleScroll}
+      onScroll={useVirtualScroll ? handleScroll : undefined}
     >
-      <div style={{ height: totalHeight, position: 'relative' }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, transform: `translateY(${offsetY}px)` }}>
+      <div style={useVirtualScroll ? { height: totalHeight, position: 'relative' } : undefined}>
+        <div style={useVirtualScroll ? { position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${offsetY}px)` } : undefined}>
           {visibleRows}
         </div>
       </div>

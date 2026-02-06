@@ -1,7 +1,7 @@
 /**
- * DiffModal - 全屏 Diff 查看器 (Single File)
+ * DiffModal - 全屏 Diff 查看器
  * 
- * 使用 Dialog 风格：遮罩 + 居中卡片 + 动画
+ * VSCode 风格：全屏铺满 + 毛玻璃背景 + 顶部操作栏
  */
 
 import { memo, useState, useEffect, useMemo } from 'react'
@@ -40,17 +40,13 @@ export const DiffModal = memo(function DiffModal({
   const [isVisible, setIsVisible] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('split')
 
-  // 响应式
   useEffect(() => {
-    const checkWidth = () => {
-      setViewMode(window.innerWidth >= 1000 ? 'split' : 'unified')
-    }
+    const checkWidth = () => setViewMode(window.innerWidth >= 1000 ? 'split' : 'unified')
     checkWidth()
     window.addEventListener('resize', checkWidth)
     return () => window.removeEventListener('resize', checkWidth)
   }, [])
 
-  // Mount/Unmount 动画
   useEffect(() => {
     if (isOpen) {
       setShouldRender(true)
@@ -68,7 +64,6 @@ export const DiffModal = memo(function DiffModal({
     }
   }, [shouldRender, isOpen])
 
-  // ESC 关闭
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) onClose()
@@ -77,7 +72,6 @@ export const DiffModal = memo(function DiffModal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose])
 
-  // 解析 diff
   const { before, after } = useMemo(() => {
     if (typeof diff === 'object') return diff
     return extractContentFromUnifiedDiff(diff)
@@ -101,62 +95,58 @@ export const DiffModal = memo(function DiffModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-200 ease-out"
+      className="fixed inset-0 z-[100] flex flex-col transition-opacity duration-200"
       style={{
-        backgroundColor: isVisible ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0)',
-        backdropFilter: isVisible ? 'blur(4px)' : 'blur(0px)',
+        opacity: isVisible ? 1 : 0,
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        backgroundColor: 'hsl(var(--bg-000) / 0.85)',
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      role="dialog"
+      aria-modal="true"
     >
-      {/* Card */}
-      <div
-        className="relative bg-bg-000 border border-border-200/60 rounded-xl shadow-2xl flex flex-col overflow-hidden w-full h-full max-w-[96vw] max-h-[92vh] transition-all duration-200 ease-out"
-        style={{
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? 'scale(1) translateY(0)' : 'scale(0.97) translateY(8px)',
-        }}
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border-100/50 bg-bg-100/30 shrink-0">
-          <div className="flex items-center gap-4 min-w-0">
-            {fileName && (
-              <span className="text-text-100 font-mono text-sm font-medium truncate">{fileName}</span>
-            )}
-            <div className="flex items-center gap-2 text-xs font-mono tabular-nums shrink-0">
-              {diffStats.additions > 0 && (
-                <span className="text-success-100">+{diffStats.additions}</span>
-              )}
-              {diffStats.deletions > 0 && (
-                <span className="text-danger-100">-{diffStats.deletions}</span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <ViewModeSwitch viewMode={viewMode} onChange={setViewMode} />
-            <button
-              onClick={onClose}
-              className="p-1.5 text-text-400 hover:text-text-100 hover:bg-bg-200 rounded-lg transition-colors"
-            >
-              <CloseIcon size={16} />
-            </button>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between h-11 px-4 border-b border-border-100/40 shrink-0">
+        {/* Left: file info */}
+        <div className="flex items-center gap-3 min-w-0">
+          {fileName && (
+            <span className="text-text-100 font-mono text-[13px] font-medium truncate">
+              {fileName}
+            </span>
+          )}
+          {filePath && fileName && filePath !== fileName && (
+            <span className="text-text-500 font-mono text-[11px] truncate hidden sm:block">
+              {filePath}
+            </span>
+          )}
+          <div className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums shrink-0">
+            {diffStats.additions > 0 && <span className="text-success-100">+{diffStats.additions}</span>}
+            {diffStats.deletions > 0 && <span className="text-danger-100">-{diffStats.deletions}</span>}
           </div>
         </div>
 
-        {/* Diff Content */}
-        <div className="flex-1 min-h-0">
-          <DiffViewer
-            before={before}
-            after={after}
-            language={lang}
-            viewMode={viewMode}
-          />
+        {/* Right: controls */}
+        <div className="flex items-center gap-2 shrink-0">
+          <ViewModeSwitch viewMode={viewMode} onChange={setViewMode} />
+          <div className="w-px h-4 bg-border-200/30" />
+          <button
+            onClick={onClose}
+            className="p-1 text-text-400 hover:text-text-100 hover:bg-bg-200/60 rounded-md transition-colors"
+            title="Close (Esc)"
+          >
+            <CloseIcon size={16} />
+          </button>
         </div>
+      </div>
+
+      {/* Diff — 填满剩余空间 */}
+      <div className="flex-1 min-h-0">
+        <DiffViewer
+          before={before}
+          after={after}
+          language={lang}
+          viewMode={viewMode}
+        />
       </div>
     </div>,
     document.body
@@ -164,7 +154,7 @@ export const DiffModal = memo(function DiffModal({
 })
 
 // ============================================
-// ViewModeSwitch - 复用组件
+// ViewModeSwitch
 // ============================================
 
 export function ViewModeSwitch({
@@ -175,9 +165,9 @@ export function ViewModeSwitch({
   onChange: (mode: ViewMode) => void
 }) {
   return (
-    <div className="flex items-center bg-bg-200/80 rounded-lg p-0.5 text-xs">
+    <div className="flex items-center bg-bg-200/60 rounded-md p-0.5 text-[11px]">
       <button
-        className={`px-2.5 py-1 rounded-md transition-colors ${
+        className={`px-2 py-0.5 rounded transition-colors ${
           viewMode === 'split'
             ? 'bg-bg-000 text-text-100 shadow-sm'
             : 'text-text-400 hover:text-text-200'
@@ -187,7 +177,7 @@ export function ViewModeSwitch({
         Split
       </button>
       <button
-        className={`px-2.5 py-1 rounded-md transition-colors ${
+        className={`px-2 py-0.5 rounded transition-colors ${
           viewMode === 'unified'
             ? 'bg-bg-000 text-text-100 shadow-sm'
             : 'text-text-400 hover:text-text-200'

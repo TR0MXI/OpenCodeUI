@@ -14,7 +14,7 @@ import { CopyButton } from './ui'
 import { DiffViewer, extractContentFromUnifiedDiff, type ViewMode } from './DiffViewer'
 import { CodePreview } from './FileExplorer'
 import { detectLanguage } from '../utils/languageUtils'
-import { DiffModal } from './DiffModal'
+import { FullscreenViewer } from './FullscreenViewer'
 
 // ============================================
 // Types
@@ -73,7 +73,7 @@ export const ContentBlock = memo(function ContentBlock({
   loadingText = 'Loading...',
 }: ContentBlockProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
-  const [diffModalOpen, setDiffModalOpen] = useState(false)
+  const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const [diffViewMode, setDiffViewMode] = useState<ViewMode>('split')
   const contentRef = useRef<HTMLDivElement>(null)
   
@@ -192,13 +192,13 @@ export const ContentBlock = memo(function ContentBlock({
             </div>
           )}
           
-          {/* Fullscreen button (diff only) */}
-          {isDiff && diff && !collapsed && (
+          {/* Fullscreen button - 支持 diff 和代码 */}
+          {(isDiff || content?.trim()) && !collapsed && (
             <button
               className="p-0.5 text-text-400 hover:text-text-200 rounded transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
-                setDiffModalOpen(true)
+                setFullscreenOpen(true)
               }}
               title="Fullscreen"
             >
@@ -260,17 +260,27 @@ export const ContentBlock = memo(function ContentBlock({
         </div>
       </div>
       
-      {/* Diff Modal */}
-      {isDiff && diff && (
-        <DiffModal
-          isOpen={diffModalOpen}
-          onClose={() => setDiffModalOpen(false)}
+      {/* Fullscreen Viewer - 支持 diff 和代码 */}
+      {isDiff && diff ? (
+        <FullscreenViewer
+          mode="diff"
+          isOpen={fullscreenOpen}
+          onClose={() => setFullscreenOpen(false)}
           diff={diff}
           filePath={filePath}
           language={lang}
           diffStats={diffStats || undefined}
         />
-      )}
+      ) : content?.trim() ? (
+        <FullscreenViewer
+          mode="code"
+          isOpen={fullscreenOpen}
+          onClose={() => setFullscreenOpen(false)}
+          content={content}
+          filePath={filePath}
+          language={lang}
+        />
+      ) : null}
     </div>
   )
 })

@@ -17,5 +17,6 @@ export { CodeBlock } from './CodeBlock'
 export { ContentBlock } from './ContentBlock'
 export type { ContentBlockProps } from './ContentBlock'
 
-// Re-export DiffModal
-export { DiffModal } from './DiffModal'
+// Re-export FullscreenViewer
+export { FullscreenViewer, CodeViewer, DiffModalViewer } from './FullscreenViewer'
+export type { FullscreenViewerProps, ViewerMode } from './FullscreenViewer'

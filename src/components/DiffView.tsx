@@ -5,7 +5,7 @@ import { clsx } from 'clsx'
 import { useSyntaxHighlight } from '../hooks/useSyntaxHighlight'
 import { detectLanguage } from '../utils/languageUtils'
 import { syntaxErrorHandler } from '../utils'
-import { DiffModal } from './DiffModal'
+import { FullscreenViewer } from './FullscreenViewer'
 
 interface DiffViewProps {
   /** Unified diff format string */
@@ -338,7 +338,8 @@ export const DiffView = memo(function DiffView({
       
       {/* Diff Modal */}
       {content && (
-        <DiffModal
+        <FullscreenViewer
+          mode="diff"
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           diff={content}
