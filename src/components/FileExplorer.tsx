@@ -575,7 +575,7 @@ export function CodePreview({
     
     if (lineElements.length === 0) return highlightedLinesRef.current
     
-    const result = Array.from(lineElements).map(el => el.innerHTML || '&nbsp;')
+    const result = Array.from(lineElements).map(el => el.innerHTML || '')
     highlightedLinesRef.current = result
     return result
   }, [html, isLoading])

@@ -6,6 +6,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo, t
 import { getPath, type ApiPath } from '../api'
 import { useRouter } from '../hooks/useRouter'
 import { handleError, normalizeToForwardSlash, getDirectoryName, isSameDirectory } from '../utils'
+import { layoutStore, useLayoutStore } from '../store/layoutStore'
 
 export interface SavedDirectory {
   path: string
@@ -26,9 +27,9 @@ export interface DirectoryContextValue {
   removeDirectory: (path: string) => void
   /** 服务端路径信息 */
   pathInfo: ApiPath | null
-  /** 侧边栏是否展开（桌面端） */
+  /** 侧边栏是否展开（桌面端）- 从 layoutStore 读取 */
   sidebarExpanded: boolean
-  /** 设置侧边栏展开状态 */
+  /** 设置侧边栏展开状态 - 委托给 layoutStore */
   setSidebarExpanded: (expanded: boolean) => void
   /** 最近使用的项目时间戳 { [path]: lastUsedAt } */
   recentProjects: Record<string, number>
@@ -36,7 +37,6 @@ export interface DirectoryContextValue {
 
 const DirectoryContext = createContext<DirectoryContextValue | null>(null)
 
-const STORAGE_KEY_SIDEBAR = 'opencode-sidebar-expanded'
 const STORAGE_KEY_SAVED = 'opencode-saved-directories'
 const STORAGE_KEY_RECENT = 'opencode-recent-projects'
 
@@ -47,6 +47,9 @@ export function DirectoryProvider({ children }: { children: ReactNode }) {
   // 从 URL 获取 directory（替代 localStorage）
   const { directory: urlDirectory, setDirectory: setUrlDirectory } = useRouter()
   
+  // 从 layoutStore 获取 sidebarExpanded
+  const { sidebarExpanded } = useLayoutStore()
+  
   const [savedDirectories, setSavedDirectories] = useState<SavedDirectory[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SAVED)
@@ -54,11 +57,6 @@ export function DirectoryProvider({ children }: { children: ReactNode }) {
     } catch {
       return []
     }
-  })
-  
-  const [sidebarExpanded, setSidebarExpandedState] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_SIDEBAR)
-    return saved !== 'false'
   })
 
   const [recentProjects, setRecentProjects] = useState<RecentProjects>(() => {
@@ -124,10 +122,9 @@ export function DirectoryProvider({ children }: { children: ReactNode }) {
     }
   }, [urlDirectory, setCurrentDirectory])
 
-  // 设置侧边栏展开
+  // 设置侧边栏展开 - 委托给 layoutStore
   const setSidebarExpanded = useCallback((expanded: boolean) => {
-    setSidebarExpandedState(expanded)
-    localStorage.setItem(STORAGE_KEY_SIDEBAR, String(expanded))
+    layoutStore.setSidebarExpanded(expanded)
   }, [])
 
   // 稳定化 Provider value，避免每次渲染创建新对象导致子组件不必要重渲染
@@ -166,4 +163,35 @@ export function useDirectory(): DirectoryContextValue {
     throw new Error('useDirectory must be used within a DirectoryProvider')
   }
   return context
+}
+
+// ============================================
+// 细粒度 Hooks - 避免不必要的重渲染
+// ============================================
+
+/** 只获取当前目录 */
+export function useCurrentDirectory(): string | undefined {
+  const { currentDirectory } = useDirectory()
+  return currentDirectory
+}
+
+/** 只获取保存的目录列表 */
+export function useSavedDirectories(): SavedDirectory[] {
+  const { savedDirectories } = useDirectory()
+  return savedDirectories
+}
+
+/** 只获取路径信息 */
+export function usePathInfo(): ApiPath | null {
+  const { pathInfo } = useDirectory()
+  return pathInfo
+}
+
+/** 侧边栏状态 - 直接从 layoutStore 读取，更高效 */
+export function useSidebarExpanded(): [boolean, (expanded: boolean) => void] {
+  const { sidebarExpanded } = useLayoutStore()
+  const setSidebarExpanded = useCallback((expanded: boolean) => {
+    layoutStore.setSidebarExpanded(expanded)
+  }, [])
+  return [sidebarExpanded, setSidebarExpanded]
 }

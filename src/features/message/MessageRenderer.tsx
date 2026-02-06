@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { ChevronDownIcon, UndoIcon } from '../../components/Icons'
+import { ChevronDownIcon, ChevronRightIcon, UndoIcon } from '../../components/Icons'
 import { useEffect, useMemo } from 'react'
 import { CopyButton } from '../../components/ui'
 import { useDelayedRender } from '../../hooks'
@@ -104,9 +104,9 @@ const UserMessageView = memo(function UserMessageView({ message, onUndo, canUndo
               className="flex items-center gap-1 text-xs text-text-400 hover:text-text-300 transition-colors py-1 px-2 rounded hover:bg-bg-200"
             >
               <span>{showSystemContext ? 'Hide' : 'Show'} system context ({syntheticParts.length})</span>
-              <span className={`transition-transform duration-200 ${showSystemContext ? 'rotate-180' : ''}`}>
-                <ChevronDownIcon size={10} />
-              </span>
+              <span>
+              {showSystemContext ? <ChevronDownIcon size={10} /> : <ChevronRightIcon size={10} />}
+            </span>
             </button>
             
             {showSystemContext && (
@@ -284,8 +284,8 @@ const ToolGroup = memo(function ToolGroup({ parts, stepFinish }: ToolGroupProps)
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 py-1.5 text-text-400 text-sm hover:text-text-200 rounded-md transition-colors w-fit"
       >
-        <span className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
-          <ChevronDownIcon size={14} />
+        <span>
+          {expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
         </span>
         <span className="whitespace-nowrap tabular-nums">
           {isAllDone ? `${totalCount} steps` : `${doneCount}/${totalCount} steps`}

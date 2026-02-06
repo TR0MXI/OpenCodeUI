@@ -115,14 +115,44 @@ class MessageStore {
     state.prependedCount = Math.max(0, state.prependedCount - excess)
     state.hasMoreHistory = false
 
-    // 如果触发裁剪，清理对应的持久化索引（避免悬挂）
+    // 如果触发裁剪，清理对应的持久化索引和 hydration 缓存（避免内存泄漏）
     const prefix = `${sessionId}:`
     const keepIds = new Set(state.messages.map(m => m.info.id))
+    
+    // 清理 persistedMessageKeys
     for (const key of this.persistedMessageKeys) {
       if (key.startsWith(prefix)) {
         const id = key.slice(prefix.length)
         if (!keepIds.has(id)) {
           this.persistedMessageKeys.delete(key)
+        }
+      }
+    }
+    
+    // 清理 hydratedMessageKeys
+    for (const key of this.hydratedMessageKeys) {
+      if (key.startsWith(prefix)) {
+        const id = key.slice(prefix.length)
+        if (!keepIds.has(id)) {
+          this.hydratedMessageKeys.delete(key)
+        }
+      }
+    }
+    
+    // 清理 hydratedMessageIds (这个是纯 messageId，需要检查是否在任何 session 中存在)
+    // 为了安全，只在当前 session 上下文中清理
+    for (const id of this.hydratedMessageIds) {
+      if (!keepIds.has(id)) {
+        // 检查是否在其他 session 中存在
+        let existsInOtherSession = false
+        for (const [sid, otherState] of this.sessions) {
+          if (sid !== sessionId && otherState.messages.some(m => m.info.id === id)) {
+            existsInOtherSession = true
+            break
+          }
+        }
+        if (!existsInOtherSession) {
+          this.hydratedMessageIds.delete(id)
         }
       }
     }
@@ -1083,7 +1113,7 @@ messageStore.subscribe(() => {
 // React Hook
 // ============================================
 
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, useRef, useCallback } from 'react'
 
 /**
  * React hook to subscribe to message store
@@ -1095,6 +1125,61 @@ export function useMessageStore(): MessageStoreSnapshot {
     getSnapshot,
     getSnapshot
   )
+}
+
+/**
+ * 选择器模式 - 只订阅需要的字段，减少不必要的重渲染
+ * 
+ * @example
+ * // 只订阅 sessionId 和 isStreaming
+ * const { sessionId, isStreaming } = useMessageStoreSelector(
+ *   state => ({ sessionId: state.sessionId, isStreaming: state.isStreaming })
+ * )
+ */
+export function useMessageStoreSelector<T>(
+  selector: (state: MessageStoreSnapshot) => T,
+  equalityFn: (a: T, b: T) => boolean = shallowEqual
+): T {
+  const prevResultRef = useRef<T | undefined>(undefined)
+  
+  const getSelectedSnapshot = useCallback(() => {
+    const fullSnapshot = getSnapshot()
+    const newResult = selector(fullSnapshot)
+    
+    // 如果结果相等，返回之前的引用以避免重渲染
+    if (prevResultRef.current !== undefined && equalityFn(prevResultRef.current, newResult)) {
+      return prevResultRef.current
+    }
+    
+    prevResultRef.current = newResult
+    return newResult
+  }, [selector, equalityFn])
+  
+  return useSyncExternalStore(
+    (onStoreChange) => messageStore.subscribe(onStoreChange),
+    getSelectedSnapshot,
+    getSelectedSnapshot
+  )
+}
+
+/**
+ * 浅比较两个对象
+ */
+function shallowEqual<T>(a: T, b: T): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object') return false
+  if (a === null || b === null) return false
+  
+  const keysA = Object.keys(a as object)
+  const keysB = Object.keys(b as object)
+  
+  if (keysA.length !== keysB.length) return false
+  
+  for (const key of keysA) {
+    if ((a as any)[key] !== (b as any)[key]) return false
+  }
+  
+  return true
 }
 
 // 缓存：sessionId -> Snapshot
@@ -1138,4 +1223,32 @@ export function useSessionState(sessionId: string | null) {
     getSnapshot,
     getSnapshot
   )
+}
+
+// ============================================
+// 便捷选择器 Hooks
+// ============================================
+
+/** 只订阅 sessionId */
+export function useCurrentSessionId(): string | null {
+  return useMessageStoreSelector(state => state.sessionId)
+}
+
+/** 只订阅 isStreaming */
+export function useIsStreaming(): boolean {
+  return useMessageStoreSelector(state => state.isStreaming)
+}
+
+/** 只订阅 messages */
+export function useMessages(): Message[] {
+  return useMessageStoreSelector(state => state.messages, (a, b) => a === b)
+}
+
+/** 只订阅 canUndo/canRedo */
+export function useUndoRedoState() {
+  return useMessageStoreSelector(state => ({
+    canUndo: state.canUndo,
+    canRedo: state.canRedo,
+    redoSteps: state.redoSteps,
+  }))
 }

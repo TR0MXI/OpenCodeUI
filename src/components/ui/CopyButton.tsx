@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { CopyIcon, CheckIcon } from '../Icons'
 import { clsx } from 'clsx'
 import { clipboardErrorHandler } from '../../utils'
@@ -13,13 +13,27 @@ interface CopyButtonProps {
 
 export function CopyButton({ text, className, position = 'absolute', groupName }: CopyButtonProps) {
   const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 清理 timeout，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleCopy = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent triggering parent clicks
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      // 清理之前的 timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      timeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       clipboardErrorHandler('copy', err)
     }

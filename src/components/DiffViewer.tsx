@@ -25,6 +25,50 @@ const LARGE_FILE_CHARS = 300000
 // 自适应高度阈值 - 行数少于此值时不用虚拟滚动
 const AUTO_HEIGHT_THRESHOLD = 100
 
+// 滚动节流间隔（毫秒）
+const SCROLL_THROTTLE_MS = 16 // ~60fps
+
+// ============================================
+// Throttle 工具函数
+// ============================================
+
+function throttle<T extends (...args: any[]) => void>(
+  fn: T,
+  delay: number
+): T & { cancel: () => void } {
+  let lastCall = 0
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  const throttled = ((...args: Parameters<T>) => {
+    const now = Date.now()
+    const remaining = delay - (now - lastCall)
+
+    if (remaining <= 0) {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      lastCall = now
+      fn(...args)
+    } else if (!timeoutId) {
+      timeoutId = setTimeout(() => {
+        lastCall = Date.now()
+        timeoutId = null
+        fn(...args)
+      }, remaining)
+    }
+  }) as T & { cancel: () => void }
+
+  throttled.cancel = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  }
+
+  return throttled
+}
+
 // ============================================
 // Types
 // ============================================
@@ -213,9 +257,20 @@ const SplitDiffView = memo(function SplitDiffView({
     return () => observer.disconnect()
   }, [pairedLines, startIndex, endIndex])
   
+  // 使用 throttle 优化滚动性能
+  const throttledSetScrollTop = useMemo(
+    () => throttle((value: number) => setScrollTop(value), SCROLL_THROTTLE_MS),
+    []
+  )
+  
+  // 清理 throttle
+  useEffect(() => {
+    return () => throttledSetScrollTop.cancel()
+  }, [throttledSetScrollTop])
+  
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop)
-  }, [])
+    throttledSetScrollTop(e.currentTarget.scrollTop)
+  }, [throttledSetScrollTop])
   
   // 同步 proxy 滚动条 <-> 面板
   const handleLeftScrollbar = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -382,9 +437,20 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
     return () => resizeObserver.disconnect()
   }, [isResizing])
   
+  // 使用 throttle 优化滚动性能
+  const throttledSetScrollTop = useMemo(
+    () => throttle((value: number) => setScrollTop(value), SCROLL_THROTTLE_MS),
+    []
+  )
+  
+  // 清理 throttle
+  useEffect(() => {
+    return () => throttledSetScrollTop.cancel()
+  }, [throttledSetScrollTop])
+  
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop)
-  }, [])
+    throttledSetScrollTop(e.currentTarget.scrollTop)
+  }, [throttledSetScrollTop])
 
   if (lines.length === 0) {
     return <div className="h-full flex items-center justify-center text-text-400 text-sm">No changes</div>
@@ -428,7 +494,10 @@ const UnifiedDiffView = memo(function UnifiedDiffView({
       onScroll={useVirtualScroll ? handleScroll : undefined}
     >
       <div style={useVirtualScroll ? { height: totalHeight, position: 'relative' } : undefined}>
-        <div style={useVirtualScroll ? { position: 'absolute', top: 0, left: 0, right: 0, transform: `translateY(${offsetY}px)` } : undefined}>
+        <div 
+          className="inline-block min-w-full"
+          style={useVirtualScroll ? { position: 'absolute', top: 0, left: 0, transform: `translateY(${offsetY}px)` } : undefined}
+        >
           {visibleRows}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { CloseIcon, ChevronDownIcon } from '../../components/Icons'
 import { getAttachmentIcon, hasExpandableContent } from './utils'
 import type { Attachment } from './types'
@@ -11,7 +11,7 @@ interface AttachmentItemProps {
   className?: string
 }
 
-export function AttachmentItem({ 
+function AttachmentItemComponent({ 
   attachment, 
   onRemove, 
   size = 'md', 
@@ -123,6 +123,7 @@ function ExpandedContent({ attachment, imageError, onImageError }: ExpandedConte
             src={url} 
             alt={attachment.displayName}
             onError={onImageError}
+            loading="lazy"
             className="max-h-64 w-full rounded object-contain bg-bg-300/50"
           />
         </div>
@@ -208,3 +209,9 @@ function ExpandedContent({ attachment, imageError, onImageError }: ExpandedConte
     </div>
   )
 }
+
+// ============================================
+// Export with memo for performance optimization
+// ============================================
+
+export const AttachmentItem = memo(AttachmentItemComponent)

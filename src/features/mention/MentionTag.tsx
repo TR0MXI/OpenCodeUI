@@ -3,7 +3,7 @@
 // 可复用的 mention 标签，支持点击复制
 // ============================================
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { MentionType, MentionItem } from './types'
 import { formatMentionLabel, getFileName, MENTION_COLORS } from './utils'
 import { CheckIcon } from '../../components/Icons'
@@ -38,6 +38,16 @@ export function MentionTag({
   inEditor = false,
 }: MentionTagProps) {
   const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  
+  // 清理 timeout，防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
   
   const name = displayName || getFileName(value)
   const label = formatMentionLabel(type, name)
@@ -55,7 +65,11 @@ export function MentionTag({
     // 复制完整值
     navigator.clipboard.writeText(value).then(() => {
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      // 清理之前的 timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+      timeoutRef.current = setTimeout(() => setCopied(false), 1500)
     })
   }, [onClick, value])
   
@@ -128,8 +142,10 @@ export function RichText({ text, className = '' }: RichTextProps) {
 /**
  * 为 contentEditable 创建 mention span 元素
  * 用于在输入框中插入 mention 标签
+ * 
+ * 返回 { element, cleanup } - 调用者需要在元素移除时调用 cleanup 清理事件监听器
  */
-export function createMentionElement(item: MentionItem): HTMLSpanElement {
+export function createMentionElement(item: MentionItem): { element: HTMLSpanElement; cleanup: () => void } {
   const span = document.createElement('span')
   const label = formatMentionLabel(item.type, item.displayName)
   
@@ -146,8 +162,11 @@ export function createMentionElement(item: MentionItem): HTMLSpanElement {
   span.textContent = label
   span.title = `Click to copy: ${item.value}`
   
-  // 添加点击复制功能
-  span.addEventListener('click', (e) => {
+  // 用于清理的 timeout ref
+  let copyTimeoutId: ReturnType<typeof setTimeout> | null = null
+  
+  // 点击复制功能
+  const handleClick = (e: Event) => {
     e.preventDefault()
     e.stopPropagation()
     
@@ -157,11 +176,27 @@ export function createMentionElement(item: MentionItem): HTMLSpanElement {
       const checkIcon = '<svg class="w-3 h-3 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
       span.innerHTML = `${checkIcon}<span>${label}</span>`
       
-      setTimeout(() => {
+      // 清理之前的 timeout
+      if (copyTimeoutId) {
+        clearTimeout(copyTimeoutId)
+      }
+      copyTimeoutId = setTimeout(() => {
         span.innerHTML = originalContent
+        copyTimeoutId = null
       }, 1200)
     })
-  })
+  }
   
-  return span
+  span.addEventListener('click', handleClick)
+  
+  // 返回清理函数
+  const cleanup = () => {
+    span.removeEventListener('click', handleClick)
+    if (copyTimeoutId) {
+      clearTimeout(copyTimeoutId)
+      copyTimeoutId = null
+    }
+  }
+  
+  return { element: span, cleanup }
 }

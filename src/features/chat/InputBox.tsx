@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { AttachmentPreview, type Attachment } from '../attachment'
 import { MentionMenu, detectMentionTrigger, type MentionMenuHandle, type MentionItem } from '../mention'
 import { SlashCommandMenu, type SlashCommandMenuHandle } from '../slash-command'
 import { InputToolbar } from './input/InputToolbar'
 import { UndoStatus } from './input/UndoStatus'
+import { useImageCompressor } from '../../hooks/useImageCompressor'
 import type { ApiAgent } from '../../api/client'
 import type { Command } from '../../api/command'
 
@@ -42,7 +43,7 @@ export interface InputBoxProps {
 // InputBox Component
 // ============================================
 
-export function InputBox({ 
+function InputBoxComponent({ 
   onSend, 
   onAbort,
   onCommand,
@@ -403,100 +404,50 @@ export function InputBox({
     textareaRef.current?.focus()
   }, [])
 
-  // 图片上传（带压缩）
-  const handleImageUpload = useCallback((files: FileList | null) => {
+  // 图片压缩器（使用 Web Worker）
+  const { compress, needsCompression } = useImageCompressor()
+
+  // 图片上传（使用 Web Worker 压缩，避免阻塞主线程）
+  const handleImageUpload = useCallback(async (files: FileList | null) => {
     if (!files || !supportsImages) return
     
-    const MAX_SIZE = 2048  // 最大边长
-    const MAX_FILE_SIZE = 5 * 1024 * 1024  // 5MB
-    const QUALITY = 0.85
-    
-    Array.from(files).forEach(file => {
-      if (!file.type.startsWith('image/')) return
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue
       
-      // 如果文件小于限制且不是很大的图片，直接用原图
-      if (file.size < 500 * 1024) {  // 小于500KB直接用
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          const dataUrl = e.target?.result as string
-          const attachment: Attachment = {
-            id: crypto.randomUUID(),
-            type: 'file',
-            displayName: file.name,
-            url: dataUrl,
-            mime: file.type,
-          }
-          setAttachments(prev => [...prev, attachment])
-        }
-        reader.readAsDataURL(file)
-        return
-      }
-      
-      // 压缩大图片
-      const img = new Image()
-      const objectUrl = URL.createObjectURL(file)
-      
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl)
+      try {
+        let dataUrl: string
+        let mimeType: string
         
-        let { width, height } = img
-        
-        // 计算缩放比例
-        if (width > MAX_SIZE || height > MAX_SIZE) {
-          const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height)
-          width = Math.round(width * ratio)
-          height = Math.round(height * ratio)
+        // 小图片直接使用，大图片用 Worker 压缩
+        if (!needsCompression(file)) {
+          // 小于 500KB，直接读取
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target?.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+          mimeType = file.type
+        } else {
+          // 使用 Worker 压缩
+          const result = await compress(file)
+          dataUrl = result.dataUrl
+          mimeType = result.mimeType
         }
         
-        // 使用 Canvas 压缩
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        
-        ctx.drawImage(img, 0, 0, width, height)
-        
-        // 转换为 blob，然后检查大小
-        canvas.toBlob((blob) => {
-          if (!blob) return
-          
-          // 如果还是太大，降低质量重试
-          if (blob.size > MAX_FILE_SIZE) {
-            canvas.toBlob((smallerBlob) => {
-              if (!smallerBlob) return
-              blobToAttachment(smallerBlob, file.name)
-            }, 'image/jpeg', 0.6)
-          } else {
-            blobToAttachment(blob, file.name)
-          }
-        }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', QUALITY)
-      }
-      
-      img.onerror = () => {
-        URL.revokeObjectURL(objectUrl)
-        console.warn('[InputBox] Failed to load image for compression')
-      }
-      
-      img.src = objectUrl
-    })
-    
-    function blobToAttachment(blob: Blob, fileName: string) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string
         const attachment: Attachment = {
           id: crypto.randomUUID(),
           type: 'file',
-          displayName: fileName,
+          displayName: file.name,
           url: dataUrl,
-          mime: blob.type,
+          mime: mimeType,
         }
         setAttachments(prev => [...prev, attachment])
+      } catch (err) {
+        console.warn('[InputBox] Failed to process image:', err)
       }
-      reader.readAsDataURL(blob)
     }
-  }, [supportsImages])
+  }, [supportsImages, compress, needsCompression])
 
   // 删除附件
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -706,3 +657,9 @@ function detectSlashTrigger(text: string, cursorPos: number): { query: string; s
   
   return { query, startIndex: 0 }
 }
+
+// ============================================
+// Export with memo for performance optimization
+// ============================================
+
+export const InputBox = memo(InputBoxComponent)

@@ -303,7 +303,9 @@ function rebuildEditorContent(
   }
   
   // 创建新的 mention 元素
-  const mentionSpan = createMentionElement(newMention)
+  const { element: mentionSpan } = createMentionElement(newMention)
+  // 注意：这里不需要调用 cleanup，因为 contentEditable 编辑器会在内容被替换时自动移除 DOM 元素
+  // 事件监听器会随着 DOM 元素被 GC 一起被清理
   editor.appendChild(mentionSpan)
   
   // 添加空格和后续文本

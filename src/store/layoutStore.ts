@@ -43,6 +43,9 @@ interface LayoutState {
     right: string | null
   }
   
+  // 侧边栏
+  sidebarExpanded: boolean
+  
   // 右侧栏
   rightPanelOpen: boolean
   rightPanelWidth: number
@@ -57,6 +60,8 @@ interface LayoutState {
 
 type Subscriber = () => void
 
+const STORAGE_KEY_SIDEBAR = 'opencode-sidebar-expanded'
+
 class LayoutStore {
   private state: LayoutState = {
     panelTabs: [
@@ -68,6 +73,7 @@ class LayoutStore {
       bottom: null,
       right: 'files',
     },
+    sidebarExpanded: true,
     rightPanelOpen: false,
     rightPanelWidth: 450,
     previewFile: null,
@@ -77,8 +83,15 @@ class LayoutStore {
   private subscribers = new Set<Subscriber>()
 
   constructor() {
-    // 从 localStorage 恢复尺寸
+    // 从 localStorage 恢复状态
     try {
+      // 侧边栏
+      const savedSidebar = localStorage.getItem(STORAGE_KEY_SIDEBAR)
+      if (savedSidebar !== null) {
+        this.state.sidebarExpanded = savedSidebar !== 'false'
+      }
+      
+      // 右侧面板宽度
       const savedWidth = localStorage.getItem('opencode-right-panel-width')
       if (savedWidth) {
         const width = parseInt(savedWidth)
@@ -86,6 +99,8 @@ class LayoutStore {
           this.state.rightPanelWidth = width
         }
       }
+      
+      // 底部面板高度
       const savedBottomHeight = localStorage.getItem('opencode-bottom-panel-height')
       if (savedBottomHeight) {
         const height = parseInt(savedBottomHeight)
@@ -109,6 +124,29 @@ class LayoutStore {
 
   private notify() {
     this.subscribers.forEach(fn => fn())
+  }
+
+  // ============================================
+  // Sidebar
+  // ============================================
+  
+  getSidebarExpanded(): boolean {
+    return this.state.sidebarExpanded
+  }
+  
+  setSidebarExpanded(expanded: boolean) {
+    if (this.state.sidebarExpanded === expanded) return
+    this.state.sidebarExpanded = expanded
+    try {
+      localStorage.setItem(STORAGE_KEY_SIDEBAR, String(expanded))
+    } catch {
+      // ignore
+    }
+    this.notify()
+  }
+  
+  toggleSidebar() {
+    this.setSidebarExpanded(!this.state.sidebarExpanded)
   }
 
   // ============================================

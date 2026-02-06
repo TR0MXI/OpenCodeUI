@@ -1,5 +1,5 @@
 import { memo, useState } from 'react'
-import { ChevronDownIcon } from '../../../components/Icons'
+import { ChevronDownIcon, ChevronRightIcon } from '../../../components/Icons'
 import type { ToolPart } from '../../../types/message'
 import { useDelayedRender } from '../../../hooks'
 import { 
@@ -104,8 +104,8 @@ export const ToolPartView = memo(function ToolPartView({ part, isFirst = false, 
                 Failed
               </span>
             )}
-            <span className={`text-text-500 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
-              <ChevronDownIcon size={12} />
+            <span className="text-text-500">
+              {expanded ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
             </span>
           </div>
         </button>
