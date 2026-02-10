@@ -89,7 +89,7 @@ const DEFAULT_KEYBINDINGS: KeybindingConfig[] = [
   { action: 'toggleAgent', label: 'Toggle Agent', description: 'Switch agent mode', defaultKey: 'Alt+.', currentKey: 'Alt+.', category: 'model' },
   
   // Message
-  { action: 'sendMessage', label: 'Send Message', description: 'Send current message', defaultKey: 'Enter', currentKey: 'Enter', category: 'message' },
+  { action: 'sendMessage', label: 'Send Message', description: 'Send current message', defaultKey: 'Ctrl+Enter', currentKey: 'Ctrl+Enter', category: 'message' },
   { action: 'cancelMessage', label: 'Cancel Message', description: 'Cancel current response', defaultKey: 'Escape', currentKey: 'Escape', category: 'message' },
   { action: 'copyLastResponse', label: 'Copy Response', description: 'Copy last AI response', defaultKey: 'Alt+C', currentKey: 'Alt+C', category: 'message' },
 ]
