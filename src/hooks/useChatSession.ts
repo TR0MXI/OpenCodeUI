@@ -115,6 +115,15 @@ export function useChatSession({ chatAreaRef, currentModel }: UseChatSessionOpti
         if (prev.some(r => r.id === request.id)) return prev
         return [...prev, request]
       })
+
+      // 页面不在前台时通知用户有权限请求等待批准
+      const permDesc = request.patterns?.length
+        ? `${request.permission}: ${request.patterns[0]}`
+        : request.permission
+      sendNotification('Permission Required', permDesc, {
+        sessionId: request.sessionID,
+        directory: effectiveDirectory,
+      })
     },
     onPermissionReplied: (data) => {
       setPendingPermissionRequests(prev => 
@@ -125,6 +134,13 @@ export function useChatSession({ chatAreaRef, currentModel }: UseChatSessionOpti
       setPendingQuestionRequests(prev => {
         if (prev.some(r => r.id === request.id)) return prev
         return [...prev, request]
+      })
+
+      // 页面不在前台时通知用户有问题等待回答
+      const questionDesc = request.questions?.[0]?.header || 'AI is waiting for your input'
+      sendNotification('Question', questionDesc, {
+        sessionId: request.sessionID,
+        directory: effectiveDirectory,
       })
     },
     onQuestionReplied: (data) => {
@@ -145,6 +161,15 @@ export function useChatSession({ chatAreaRef, currentModel }: UseChatSessionOpti
       const session = sessions.find(s => s.id === sessionID)
       const title = session?.title || 'Session completed'
       sendNotification('OpenCode', title, {
+        sessionId: sessionID,
+        directory: effectiveDirectory,
+      })
+    },
+    onSessionError: (sessionID) => {
+      // 页面不在前台时通知用户 session 出错
+      const session = sessions.find(s => s.id === sessionID)
+      const title = session?.title || 'Session error'
+      sendNotification('Error', title, {
         sessionId: sessionID,
         directory: effectiveDirectory,
       })
