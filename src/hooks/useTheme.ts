@@ -35,6 +35,15 @@ export function useTheme() {
 
 
     localStorage.setItem(STORAGE_KEY_THEME_MODE, mode)
+
+    // 同步更新 theme-color meta 标签，从实际 CSS 变量取值
+    requestAnimationFrame(() => {
+      const bg = getComputedStyle(root).getPropertyValue('--color-bg-100').trim()
+      if (bg) {
+        const meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.setAttribute('content', bg)
+      }
+    })
   }, [mode])
 
   // 监听系统主题变化
