@@ -21,7 +21,7 @@ export function UndoStatus({ canRedo, revertSteps, onRedo, onRedoAll }: UndoStat
             transition: 'transform 200ms cubic-bezier(0.34, 1.2, 0.64, 1)',
             transform: canRedo ? 'scale(1)' : 'scale(0.95)',
           }}
-          className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full"
+          className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 backdrop-blur-md border border-amber-500/20 rounded-full"
         >
           <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
           <span className="text-xs text-amber-600 dark:text-amber-400">
