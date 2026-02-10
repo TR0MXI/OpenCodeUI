@@ -6,7 +6,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1a1a1a",
-  "theme_color": "#d97706",
+  "theme_color": "#262524",
   "icons": [
     {
       "src": "/opencode.svg",
