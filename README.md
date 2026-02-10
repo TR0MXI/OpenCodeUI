@@ -43,6 +43,11 @@
 
 本项目的部分 UI 风格参考了 [Claude](https://claude.ai) 的界面设计。
 
+## 预览
+
+<img width="2298" height="1495" alt="image" src="https://github.com/user-attachments/assets/dc68837b-0560-4701-b6ab-ecb13fdc1f4f" />
+<img width="2296" height="1500" alt="image" src="https://github.com/user-attachments/assets/7a8d9754-69c4-49c5-99ee-6452d94f5420" />
+
 ## 快速开始
 
 ### 前提
