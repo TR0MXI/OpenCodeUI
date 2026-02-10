@@ -80,7 +80,131 @@ export interface ThemePreset {
 }
 
 // ============================================
-// Claude 主题 - 暖调橙色品牌风格（当前默认）
+// Eucalyptus 主题 - 莫兰迪色系，默认主题
+// ============================================
+// 设计理念：
+// - 灵感来自北欧森林与晨雾，莫兰迪色系高级灰调
+// - 日间：极淡灰调底色搭配低饱和桉树绿，清爽冷静
+// - 夜间：深邃的岩石蓝灰（非纯黑），对比度柔和护眼
+// - 品牌色为桉树绿 (hsl 165)，辅助色板岩蓝 (hsl 200)
+
+const eucalyptusLight: ThemeColors = {
+  background: {
+    bg000: '150 10% 99%',
+    bg100: '150 12% 96%',
+    bg200: '150 12% 93%',
+    bg300: '150 10% 89%',
+    bg400: '150 10% 85%',
+  },
+  text: {
+    text000: '0 0% 100%',
+    text100: '170 15% 15%',
+    text200: '170 10% 40%',
+    text300: '170 8% 55%',
+    text400: '170 8% 70%',
+    text500: '170 6% 78%',
+    text600: '170 10% 85%',
+  },
+  accent: {
+    brand: '165 45% 42%',
+    main000: '165 40% 35%',
+    main100: '165 45% 42%',
+    main200: '165 50% 48%',
+    secondary100: '200 45% 50%',
+  },
+  semantic: {
+    success100: '140 40% 40%',
+    success200: '140 35% 32%',
+    successBg: '140 30% 94%',
+    warning100: '35 80% 45%',
+    warning200: '35 70% 38%',
+    warningBg: '35 60% 94%',
+    danger000: '5 55% 40%',
+    danger100: '5 60% 55%',
+    danger200: '5 65% 62%',
+    dangerBg: '5 60% 96%',
+    danger900: '5 50% 93%',
+    info100: '200 50% 50%',
+    info200: '200 45% 60%',
+    infoBg: '200 40% 95%',
+  },
+  border: {
+    border100: '160 10% 86%',
+    border200: '160 10% 82%',
+    border300: '160 10% 75%',
+  },
+  special: {
+    alwaysBlack: '0 0% 0%',
+    alwaysWhite: '0 0% 100%',
+    oncolor100: '0 0% 100%',
+  },
+}
+
+const eucalyptusDark: ThemeColors = {
+  background: {
+    bg000: '210 20% 18%',
+    bg100: '210 20% 14%',
+    bg200: '210 20% 11%',
+    bg300: '210 20% 9%',
+    bg400: '210 25% 6%',
+  },
+  text: {
+    text000: '0 0% 100%',
+    text100: '210 15% 92%',
+    text200: '210 10% 70%',
+    text300: '210 8% 55%',
+    text400: '210 8% 40%',
+    text500: '210 6% 32%',
+    text600: '210 10% 25%',
+  },
+  accent: {
+    brand: '165 50% 55%',
+    main000: '165 45% 45%',
+    main100: '165 50% 55%',
+    main200: '165 55% 65%',
+    secondary100: '200 50% 60%',
+  },
+  semantic: {
+    success100: '140 50% 55%',
+    success200: '140 45% 62%',
+    successBg: '140 30% 15%',
+    warning100: '35 80% 60%',
+    warning200: '35 75% 68%',
+    warningBg: '35 30% 15%',
+    danger000: '5 65% 60%',
+    danger100: '5 70% 65%',
+    danger200: '5 72% 72%',
+    dangerBg: '5 30% 15%',
+    danger900: '5 28% 22%',
+    info100: '200 60% 65%',
+    info200: '200 55% 72%',
+    infoBg: '200 30% 15%',
+  },
+  border: {
+    border100: '210 15% 22%',
+    border200: '210 15% 26%',
+    border300: '210 15% 32%',
+  },
+  special: {
+    alwaysBlack: '0 0% 0%',
+    alwaysWhite: '0 0% 100%',
+    oncolor100: '0 0% 100%',
+  },
+}
+
+export const eucalyptusTheme: ThemePreset = {
+  id: 'eucalyptus',
+  name: 'Eucalyptus',
+  description: 'Morandi tones, fresh and eye-friendly',
+  light: eucalyptusLight,
+  dark: eucalyptusDark,
+}
+
+// 默认主题 ID
+export const DEFAULT_THEME_ID = 'eucalyptus'
+
+// ============================================
+// Claude 主题 - 暖调橙色品牌风格
 // ============================================
 
 const claudeLight: ThemeColors = {
@@ -321,6 +445,7 @@ export const breezeTheme: ThemePreset = {
 // ============================================
 
 export const builtinThemes: ThemePreset[] = [
+  eucalyptusTheme,
   claudeTheme,
   breezeTheme,
 ]

@@ -8,7 +8,7 @@
  * - CSS 变量注入
  */
 
-import { getThemePreset, themeColorsToCSSVars, builtinThemes } from '../themes'
+import { getThemePreset, themeColorsToCSSVars, builtinThemes, DEFAULT_THEME_ID } from '../themes'
 import type { ThemePreset, ThemeColors } from '../themes'
 
 // ============================================
@@ -50,7 +50,7 @@ class ThemeStore {
   private listeners = new Set<() => void>()
   
   constructor() {
-    const savedPreset = localStorage.getItem(STORAGE_KEY_PRESET) || 'claude'
+    const savedPreset = localStorage.getItem(STORAGE_KEY_PRESET) || DEFAULT_THEME_ID
     const savedMode = localStorage.getItem(STORAGE_KEY_COLOR_MODE) as ColorMode || 'system'
     const savedCSS = localStorage.getItem(STORAGE_KEY_CUSTOM_CSS) || ''
     
@@ -161,11 +161,13 @@ class ThemeStore {
     if (preset) {
       const colors: ThemeColors = resolvedMode === 'dark' ? preset.dark : preset.light
       this.injectThemeStyle(colors)
-    }
-    // 如果是 custom 主题，不注入内置变量，完全由 customCSS 控制
-    // 但仍需要 fallback（index.css 中的 :root 默认值 = Claude light）
-    if (this.state.presetId === 'custom') {
-      this.removeThemeStyle()
+    } else if (this.state.presetId === 'custom') {
+      // Custom 主题：用默认主题颜色作为底色，用户 CSS 在上面覆盖
+      const fallback = getThemePreset(DEFAULT_THEME_ID)
+      if (fallback) {
+        const colors: ThemeColors = resolvedMode === 'dark' ? fallback.dark : fallback.light
+        this.injectThemeStyle(colors)
+      }
     }
     
     // 3. 应用自定义 CSS
@@ -192,11 +194,6 @@ class ThemeStore {
     // 用高优先级选择器覆盖 :root 中的默认值
     // 使用 :root:root 提升特异性，确保覆盖 index.css 中的所有定义
     el.textContent = `:root:root {\n  ${themeColorsToCSSVars(colors)}\n}`
-  }
-  
-  private removeThemeStyle() {
-    const el = document.getElementById(STYLE_ID_THEME)
-    if (el) el.remove()
   }
   
   private applyCustomCSS() {

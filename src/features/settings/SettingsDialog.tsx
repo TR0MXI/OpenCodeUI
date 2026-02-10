@@ -288,6 +288,7 @@ function AddServerForm({ onAdd, onCancel }: {
 // ============================================
 
 const PRESET_PREVIEW_COLORS: Record<string, { bg: string; accent: string; text: string }> = {
+  eucalyptus: { bg: '#f0f3f0', accent: '#4d9e82', text: '#1e2e28' },
   claude: { bg: '#f3f0eb', accent: '#e87c2a', text: '#2d2a26' },
   breeze: { bg: '#f3f5f7', accent: '#2ba5a5', text: '#212d36' },
   custom: { bg: '#f0f0f0', accent: '#888888', text: '#333333' },
