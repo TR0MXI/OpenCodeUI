@@ -6,6 +6,7 @@ import { InputToolbar } from './input/InputToolbar'
 import { InputFooter } from './input/InputFooter'
 import { UndoStatus } from './input/UndoStatus'
 import { useImageCompressor } from '../../hooks/useImageCompressor'
+import { keybindingStore, matchesKeybinding } from '../../store/keybindingStore'
 import type { ApiAgent } from '../../api/client'
 import type { Command } from '../../api/command'
 
@@ -249,8 +250,9 @@ function InputBoxComponent({
       return
     }
     
-    // Ctrl+Enter / Cmd+Enter 发送
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    // 发送消息（读取 keybinding 配置）
+    const sendKey = keybindingStore.getKey('sendMessage')
+    if (sendKey && matchesKeybinding(e.nativeEvent, sendKey)) {
       e.preventDefault()
       handleSend()
     }
