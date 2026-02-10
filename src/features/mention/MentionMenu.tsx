@@ -20,6 +20,7 @@ interface MentionMenuProps {
   rootPath?: string
   excludeValues?: Set<string> // 需要排除的项（已选择的）
   onSelect: (item: MentionItem) => void
+  onNavigate?: (folderPath: string) => void  // 点击文件夹时导航（移动端用）
   onClose: () => void
 }
 
@@ -31,6 +32,7 @@ export interface MentionMenuHandle {
   enterFolder: () => void
   goBack: () => void
   getSelectedItem: () => MentionItem | null
+  setRestoreFolder: (name: string) => void
 }
 
 // ============================================
@@ -44,6 +46,7 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
   rootPath = '',
   excludeValues,
   onSelect,
+  onNavigate,
   onClose,
 }, ref) {
   const [items, setItems] = useState<MentionItem[]>([])
@@ -54,11 +57,16 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
   const menuRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const searchAbortRef = useRef<AbortController | null>(null)
+  // 记住返回上级时应该定位到哪个文件夹
+  const restoreFolderRef = useRef<string | null>(null)
 
   // 初始化
   useEffect(() => {
     if (isOpen) {
-      setSelectedIndex(0)
+      // 如果有待恢复的文件夹，不重置 selectedIndex（等 loadDirectory 恢复）
+      if (!restoreFolderRef.current) {
+        setSelectedIndex(0)
+      }
       // 根据 query 解析目录路径
       const pathMatch = query.match(/^(.+\/)/)
       if (pathMatch) {
@@ -138,7 +146,18 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
           .filter(item => !excludeValues?.has(item.value))
           
         setItems(allItems)
-        setSelectedIndex(0)
+        
+        // 如果有记住的文件夹名（从子目录返回时），定位到那个文件夹
+        const restoreFolder = restoreFolderRef.current
+        if (restoreFolder) {
+          const idx = allItems.findIndex(
+            item => item.type === 'folder' && item.displayName === restoreFolder
+          )
+          setSelectedIndex(idx >= 0 ? idx : 0)
+          restoreFolderRef.current = null
+        } else {
+          setSelectedIndex(0)
+        }
       })
       .catch(err => {
         fileErrorHandler('list directory', err)
@@ -246,18 +265,21 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
       }
     },
     getSelectedItem: () => items[selectedIndex] || null,
+    setRestoreFolder: (name: string) => {
+      restoreFolderRef.current = name
+    },
   }), [items, selectedIndex, currentPath, onSelect])
 
   // 点击外部关闭
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose()
       }
     }
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
+      document.addEventListener('pointerdown', handleClickOutside)
+      return () => document.removeEventListener('pointerdown', handleClickOutside)
     }
   }, [isOpen, onClose])
 
@@ -266,7 +288,8 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-[360px] max-h-[320px] flex flex-col bg-bg-000 border border-border-300 rounded-lg shadow-lg overflow-hidden"
+      data-dropdown-open
+      className="absolute z-50 w-full max-w-[360px] max-h-[320px] flex flex-col bg-bg-000 border border-border-300 rounded-lg shadow-lg overflow-hidden"
       style={{
         bottom: '100%',
         left: 0,
@@ -276,7 +299,22 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
       {/* Path Breadcrumb - 只在有路径时显示 */}
       {currentPath !== '.' && (
         <div className="px-3 py-1.5 border-b border-border-200 flex items-center gap-1 text-xs text-text-400">
-          <span>~</span>
+          <button
+            className="flex items-center gap-0.5 hover:text-text-200 active:text-text-100 transition-colors flex-shrink-0"
+            onClick={() => {
+              if (onNavigate) {
+                // 记住当前目录名，返回后定位到它
+                const pathParts = normalizePath(currentPath).split('/')
+                restoreFolderRef.current = pathParts[pathParts.length - 1] || null
+                const parentParts = pathParts.slice(0, -1)
+                const parentPath = parentParts.length > 0 ? parentParts.join('/') + '/' : ''
+                onNavigate(parentPath)
+              }
+            }}
+            title="Go back"
+          >
+            <span>←</span>
+          </button>
           <span>/</span>
           <span className="text-text-300 truncate">{normalizePath(currentPath)}</span>
         </div>
@@ -299,13 +337,21 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
         {items.map((item, index) => (
           <button
             key={`${item.type}-${item.value}`}
-            className={`w-full px-3 py-2 flex items-center justify-between text-left transition-colors ${
+            className={`w-full px-3 py-2.5 md:py-2 flex items-center justify-between text-left transition-colors ${
               index === selectedIndex 
                 ? 'bg-accent-main-100/10' 
-                : 'hover:bg-bg-100'
+                : 'hover:bg-bg-100 active:bg-bg-100'
             }`}
-            onClick={() => onSelect(item)}
-            onMouseEnter={() => setSelectedIndex(index)}
+            onClick={() => {
+              // 文件夹：点击进入目录浏览，而不是选中
+              if (item.type === 'folder' && onNavigate) {
+                const basePath = (item.relativePath || item.displayName).replace(/\/+$/, '')
+                onNavigate(basePath + '/')
+              } else {
+                onSelect(item)
+              }
+            }}
+            onPointerEnter={() => setSelectedIndex(index)}
           >
             <div className="flex-1 min-w-0">
               <div className="text-sm text-text-100 truncate">
@@ -323,8 +369,8 @@ export const MentionMenu = forwardRef<MentionMenuHandle, MentionMenuProps>(funct
         ))}
       </div>
 
-      {/* Footer Hints */}
-      <div className="px-3 py-1.5 border-t border-border-200 text-xs text-text-500 flex gap-3">
+      {/* Footer Hints - 只在桌面端显示 */}
+      <div className="hidden md:flex px-3 py-1.5 border-t border-border-200 text-xs text-text-500 gap-3">
         <span>↑↓ select</span>
         <span>↵ confirm</span>
         <span>esc cancel</span>

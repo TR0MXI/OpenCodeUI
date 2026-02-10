@@ -226,6 +226,11 @@ function InputBoxComponent({
           if (mentionQuery.includes('/')) {
             e.preventDefault()
             const parts = mentionQuery.replace(/\/$/, '').split('/')
+            // 记住当前目录名，返回后定位到它
+            const folderName = parts[parts.length - 1]
+            if (folderName) {
+              mentionMenuRef.current.setRestoreFolder(folderName)
+            }
             parts.pop()
             const parentPath = parts.length > 0 ? parts.join('/') + '/' : ''
             updateMentionQuery(parentPath)
@@ -256,7 +261,7 @@ function InputBoxComponent({
       e.preventDefault()
       handleSend()
     }
-  }, [mentionOpen, mentionQuery, handleSend])
+  }, [mentionOpen, slashOpen, mentionQuery, handleSend])
   
   // 更新 @ 查询文本（用于进入/退出文件夹）
   const updateMentionQuery = useCallback((newQuery: string) => {
@@ -557,6 +562,7 @@ function InputBoxComponent({
               rootPath={rootPath}
               excludeValues={excludeValues}
               onSelect={handleMentionSelect}
+              onNavigate={updateMentionQuery}
               onClose={handleMentionClose}
             />
             

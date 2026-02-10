@@ -102,14 +102,14 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuHandle, SlashCommandM
 
     // 点击外部关闭
     useEffect(() => {
-      const handleClickOutside = (e: MouseEvent) => {
+      const handleClickOutside = (e: PointerEvent) => {
         if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
           onClose()
         }
       }
       if (isOpen) {
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
+        document.addEventListener('pointerdown', handleClickOutside)
+        return () => document.removeEventListener('pointerdown', handleClickOutside)
       }
     }, [isOpen, onClose])
 
@@ -118,7 +118,8 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuHandle, SlashCommandM
     return (
       <div
         ref={menuRef}
-        className="absolute z-50 w-[320px] max-h-[280px] flex flex-col bg-bg-000 border border-border-300 rounded-lg shadow-lg overflow-hidden"
+        data-dropdown-open
+        className="absolute z-50 w-full max-w-[320px] max-h-[280px] flex flex-col bg-bg-000 border border-border-300 rounded-lg shadow-lg overflow-hidden"
         style={{
           bottom: '100%',
           left: 0,
@@ -150,13 +151,13 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuHandle, SlashCommandM
             <button
               key={cmd.name}
               title={cmd.description}
-              className={`w-full px-3 py-2 flex items-start gap-3 text-left transition-colors ${
+              className={`w-full px-3 py-2.5 md:py-2 flex items-start gap-3 text-left transition-colors ${
                 index === selectedIndex
                   ? 'bg-accent-main-100/10'
-                  : 'hover:bg-bg-100'
+                  : 'hover:bg-bg-100 active:bg-bg-100'
               }`}
               onClick={() => onSelect(cmd)}
-              onMouseEnter={() => setSelectedIndex(index)}
+              onPointerEnter={() => setSelectedIndex(index)}
             >
               <span className="text-accent-main-100 font-mono text-sm flex-shrink-0">
                 /{cmd.name}
@@ -177,8 +178,8 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuHandle, SlashCommandM
           ))}
         </div>
 
-        {/* Footer Hints */}
-        <div className="px-3 py-1.5 border-t border-border-200 text-xs text-text-500 flex gap-3">
+        {/* Footer Hints - 只在桌面端显示 */}
+        <div className="hidden md:flex px-3 py-1.5 border-t border-border-200 text-xs text-text-500 gap-3">
           <span>↑↓ select</span>
           <span>↵ run</span>
           <span>esc cancel</span>
