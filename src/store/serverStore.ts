@@ -5,6 +5,14 @@
 import { API_BASE_URL } from '../constants'
 
 /**
+ * 服务器认证信息
+ */
+export interface ServerAuth {
+  username: string     // 用户名 (默认 opencode)
+  password: string     // 密码
+}
+
+/**
  * 服务器配置
  */
 export interface ServerConfig {
@@ -12,6 +20,7 @@ export interface ServerConfig {
   name: string         // 显示名称
   url: string          // 服务器 URL (不含尾部斜杠)
   isDefault?: boolean  // 是否为默认服务器
+  auth?: ServerAuth    // 认证信息 (可选)
 }
 
 /**
@@ -156,6 +165,22 @@ class ServerStore {
   }
   
   /**
+   * 获取当前活动服务器的认证信息
+   */
+  getActiveAuth(): ServerAuth | null {
+    const server = this.getActiveServer()
+    return server?.auth ?? null
+  }
+
+  /**
+   * 获取指定服务器的认证信息
+   */
+  getServerAuth(serverId: string): ServerAuth | null {
+    const server = this.servers.find(s => s.id === serverId)
+    return server?.auth ?? null
+  }
+
+  /**
    * 获取服务器健康状态
    */
   getHealth(serverId: string): ServerHealth | null {
@@ -264,10 +289,15 @@ class ServerStore {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000)
       
-      // 认证由浏览器原生处理（同源时遇到 401 自动弹认证对话框）
+      const headers: Record<string, string> = {}
+      if (server.auth?.password) {
+        headers['Authorization'] = makeBasicAuthHeader(server.auth)
+      }
+      
       const response = await fetch(`${server.url}/global/health`, {
         method: 'GET',
         signal: controller.signal,
+        headers,
       })
       
       clearTimeout(timeoutId)
@@ -339,3 +369,10 @@ class ServerStore {
 
 // 单例导出
 export const serverStore = new ServerStore()
+
+/**
+ * 生成 Basic Auth header 值
+ */
+export function makeBasicAuthHeader(auth: ServerAuth): string {
+  return 'Basic ' + btoa(`${auth.username}:${auth.password}`)
+}

@@ -2,7 +2,7 @@
 // Global Event Subscription (SSE) - Singleton Pattern
 // ============================================
 
-import { getApiBaseUrl } from './http'
+import { getApiBaseUrl, getAuthHeader } from './http'
 import type {
   ApiMessageWithParts,
   ApiPart,
@@ -119,9 +119,12 @@ function connectSingleton() {
   // 注册生命周期监听器（首次连接时）
   registerLifecycleListeners()
 
-  // 认证由浏览器原生处理（同源时遇到 401 自动弹认证对话框）
+  // 如果配置了密码，添加 Authorization header
   fetch(`${getApiBaseUrl()}/global/event`, {
     signal: singletonController.signal,
+    headers: {
+      ...getAuthHeader(),
+    },
   })
     .then(async (response) => {
       isConnecting = false

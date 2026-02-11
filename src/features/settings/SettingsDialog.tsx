@@ -194,7 +194,10 @@ function ServerItem({ server, health, isActive, onSelect, onDelete, onCheckHealt
           <span className="text-[13px] font-medium text-text-100 truncate">{server.name}</span>
           {isActive && <CheckIcon size={12} className="text-accent-main-100 shrink-0" />}
         </div>
-        <div className="text-[11px] text-text-400 truncate font-mono">{server.url}</div>
+        <div className="text-[11px] text-text-400 truncate font-mono flex items-center gap-1">
+          {server.url}
+          {server.auth?.password && <KeyIcon size={10} className="shrink-0 text-text-400" />}
+        </div>
       </div>
       <button 
         className="p-2 rounded hover:bg-bg-200 transition-colors"
@@ -222,11 +225,14 @@ function ServerItem({ server, health, isActive, onSelect, onDelete, onCheckHealt
 // ============================================
 
 function AddServerForm({ onAdd, onCancel }: { 
-  onAdd: (name: string, url: string) => void
+  onAdd: (name: string, url: string, username?: string, password?: string) => void
   onCancel: () => void 
 }) {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showAuth, setShowAuth] = useState(false)
   const [error, setError] = useState('')
   
   const handleSubmit = (e: React.FormEvent) => {
@@ -235,8 +241,22 @@ function AddServerForm({ onAdd, onCancel }: {
     if (!url.trim()) { setError('URL required'); return }
     try { new URL(url) } catch { setError('Invalid URL'); return }
     
-    onAdd(name.trim(), url.trim())
+    onAdd(
+      name.trim(), 
+      url.trim(), 
+      password.trim() ? (username.trim() || 'opencode') : undefined,
+      password.trim() || undefined
+    )
   }
+
+  // 检测是否跨域
+  const isCrossOrigin = (() => {
+    if (!url.trim()) return false
+    try {
+      const serverUrl = new URL(url)
+      return serverUrl.origin !== window.location.origin
+    } catch { return false }
+  })()
 
   const inputCls = "w-full h-8 px-3 text-[13px] bg-bg-000 border border-border-200 rounded-md focus:outline-none focus:border-accent-main-100/50 text-text-100 placeholder:text-text-400"
   
@@ -252,9 +272,43 @@ function AddServerForm({ onAdd, onCancel }: {
         <input type="text" value={url} onChange={e => { setUrl(e.target.value); setError('') }}
           placeholder="http://192.168.1.100:4096" className={`${inputCls} font-mono`} />
       </div>
-      <div className="text-[11px] text-text-400">
-        If the server requires a password, visit the URL in your browser first to authenticate
-      </div>
+      
+      {/* Auth toggle */}
+      <button type="button" onClick={() => setShowAuth(!showAuth)}
+        className="flex items-center gap-1.5 text-[11px] text-accent-main-100 hover:text-accent-main-200 transition-colors">
+        <KeyIcon size={10} />
+        {showAuth ? 'Hide authentication' : 'Add authentication'}
+      </button>
+      
+      {showAuth && (
+        <>
+          <div>
+            <label className="block text-[11px] font-medium text-text-300 mb-1">Username</label>
+            <input type="text" value={username} onChange={e => { setUsername(e.target.value); setError('') }}
+              placeholder="opencode (default)" className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-[11px] font-medium text-text-300 mb-1">Password</label>
+            <input type="password" value={password} onChange={e => { setPassword(e.target.value); setError('') }}
+              placeholder="OPENCODE_SERVER_PASSWORD" className={inputCls} />
+          </div>
+          
+          {/* 跨域警告 */}
+          {isCrossOrigin && password.trim() && (
+            <div className="text-[11px] text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-md px-2.5 py-2 leading-relaxed">
+              Cross-origin + password may not work due to a backend CORS limitation 
+              (<a href="https://github.com/anomalyco/opencode/issues/10047" target="_blank" rel="noopener" 
+                className="underline hover:no-underline">#10047</a>). 
+              Consider deploying the UI on the same origin or starting the server without a password.
+            </div>
+          )}
+          
+          <div className="text-[11px] text-text-400 leading-relaxed">
+            Credentials are stored in localStorage. For same-origin setups, the browser can handle auth natively without entering credentials here.
+          </div>
+        </>
+      )}
+      
       {error && <p className="text-[11px] text-danger-100">{error}</p>}
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
@@ -522,7 +576,12 @@ function GeneralSettings({ themeMode, onThemeChange, isWideMode, onToggleWideMod
         ))}
         {addingServer && (
           <AddServerForm
-            onAdd={(n, u) => { const s = addServer({ name: n, url: u }); setAddingServer(false); checkHealth(s.id) }}
+            onAdd={(n, u, user, pass) => { 
+              const auth = pass ? { username: user || 'opencode', password: pass } : undefined
+              const s = addServer({ name: n, url: u, auth })
+              setAddingServer(false)
+              checkHealth(s.id) 
+            }}
             onCancel={() => setAddingServer(false)}
           />
         )}
