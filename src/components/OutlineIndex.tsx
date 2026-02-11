@@ -281,7 +281,7 @@ const DesktopAperture = memo(function DesktopAperture({
               className="mr-2.5 text-[13px] leading-none text-text-200 whitespace-nowrap pointer-events-none"
               style={{ opacity: 0, transform: 'translateX(10px)', visibility: 'hidden' }}
             >
-              {truncate(entry.title, 14)}
+              {entry.title}
             </div>
             {/* Tick mark */}
             <div
@@ -494,7 +494,7 @@ const MobileAperture = memo(function MobileAperture({
         <div className="absolute inset-0 z-[14] bg-bg-100/40 backdrop-blur-sm flex items-start justify-center pt-[30%]">
           <div
             ref={overlayTitleRef}
-            className="text-lg font-semibold text-text-100 px-5 py-2 rounded-xl bg-bg-000/60 backdrop-blur-md shadow-lg max-w-[75vw] text-center truncate pointer-events-none"
+            className="text-lg font-semibold text-text-100 px-5 py-2 rounded-xl bg-bg-000/60 backdrop-blur-md shadow-lg max-w-[75vw] text-center pointer-events-none"
             style={{ opacity: 0, transform: 'translateY(4px)', transition: 'opacity 0.15s ease-out, transform 0.15s ease-out' }}
           />
         </div>
