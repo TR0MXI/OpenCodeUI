@@ -389,39 +389,37 @@ function SessionItem({ session, isSelected, onSelect, onDelete, onRename, densit
             {session.title || 'Untitled Chat'}
           </p>
           
-          <div className="relative flex-shrink-0 flex justify-end min-w-[60px]">
-            {/* Time: Hidden when actions visible */}
-            {session.time?.updated && (
-              <span className={`text-[10px] text-text-400 opacity-60 transition-opacity duration-200 absolute right-0 top-0.5 ${actionsVisible ? 'opacity-0' : ''} group-hover:opacity-0`}>
-                {formatRelativeTime(session.time.updated)}
-              </span>
-            )}
-            
-            {/* Actions: hover on desktop, long-press on mobile */}
-            <div className={`flex items-center gap-1 transition-all duration-200 z-10 ${
-              actionsVisible 
-                ? 'opacity-100 pointer-events-auto' 
-                : 'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto'
-            }`}>
-              <button
-                onClick={handleStartEdit}
-                className="p-2 rounded-md hover:bg-bg-300 active:bg-bg-300 text-text-400 hover:text-text-100 transition-colors focus:outline-none"
-                title="Rename"
-              >
-                <PencilIcon className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleDelete}
-                className="p-2 rounded-md hover:bg-danger-bg active:bg-danger-bg text-text-400 hover:text-danger-100 active:text-danger-100 transition-colors focus:outline-none"
-                title="Delete"
-              >
-                <TrashIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
+          {/* Time: Hidden when actions visible */}
+          {session.time?.updated && !actionsVisible && (
+            <span className="flex-shrink-0 text-[10px] text-text-400 opacity-60 group-hover:opacity-0 transition-opacity duration-200">
+              {formatRelativeTime(session.time.updated)}
+            </span>
+          )}
         </div>
 
         {/* Row 2: Stats / Placeholder */}
+        {/* Actions: hover on desktop, long-press on mobile — 整个 item 垂直居中 */}
+        <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 transition-all duration-200 z-10 ${
+          actionsVisible 
+            ? 'opacity-100 pointer-events-auto' 
+            : 'opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto'
+        }`}>
+          <button
+            onClick={handleStartEdit}
+            className="p-1.5 rounded-md hover:bg-bg-300 active:bg-bg-300 text-text-400 hover:text-text-100 transition-colors focus:outline-none"
+            title="Rename"
+          >
+            <PencilIcon className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="p-1.5 rounded-md hover:bg-danger-bg active:bg-danger-bg text-text-400 hover:text-danger-100 active:text-danger-100 transition-colors focus:outline-none"
+            title="Delete"
+          >
+            <TrashIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
         {showStats && (
           <div className={`flex items-center gap-2 ${isCompact ? 'mt-1' : 'mt-1.5'} h-4`}>
             {session.summary ? (
