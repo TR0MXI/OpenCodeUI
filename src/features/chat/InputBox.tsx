@@ -8,6 +8,7 @@ import { UndoStatus } from './input/UndoStatus'
 import { useImageCompressor } from '../../hooks/useImageCompressor'
 import { keybindingStore, matchesKeybinding } from '../../store/keybindingStore'
 import { useIsMobile } from '../../hooks'
+import { ArrowDownIcon } from '../../components/Icons'
 import type { ApiAgent } from '../../api/client'
 import type { Command } from '../../api/command'
 
@@ -41,6 +42,8 @@ export interface InputBoxProps {
   onClearRevert?: () => void
   // Animation
   registerInputBox?: (element: HTMLElement | null) => void
+  showScrollToBottom?: boolean
+  onScrollToBottom?: () => void
 }
 
 // ============================================
@@ -71,6 +74,8 @@ function InputBoxComponent({
   onRedoAll,
   onClearRevert,
   registerInputBox,
+  showScrollToBottom = false,
+  onScrollToBottom,
 }: InputBoxProps) {
   // 文本状态
   const [text, setText] = useState('')
@@ -539,13 +544,28 @@ function InputBoxComponent({
     <div className="w-full">
       <div className="mx-auto max-w-3xl px-4 pb-4 pointer-events-auto transition-[max-width] duration-300 ease-in-out" style={{ paddingBottom: 'max(16px, var(--safe-area-inset-bottom, 16px))' }}>
         <div className="flex flex-col gap-2">
-          {/* Revert Status Bar */}
-          <UndoStatus 
-            canRedo={canRedo} 
-            revertSteps={revertSteps} 
-            onRedo={onRedo} 
-            onRedoAll={onRedoAll} 
-          />
+          {(showScrollToBottom || canRedo) && (
+            <div className={`flex items-center justify-center ${canRedo ? 'gap-2' : ''}`}>
+              {canRedo && (
+                <UndoStatus 
+                  canRedo={canRedo} 
+                  revertSteps={revertSteps} 
+                  onRedo={onRedo} 
+                  onRedoAll={onRedoAll} 
+                />
+              )}
+              {showScrollToBottom && (
+                <button
+                  type="button"
+                  onClick={onScrollToBottom}
+                  className="h-[32px] w-[32px] min-w-[32px] rounded-full bg-accent-main-100/10 border border-accent-main-100/20 backdrop-blur-md flex items-center justify-center text-accent-main-000 hover:bg-accent-main-100/20 transition-colors shrink-0"
+                  aria-label="Scroll to bottom"
+                >
+                  <ArrowDownIcon size={16} />
+                </button>
+              )}
+            </div>
+          )}
           
           {/* Input Container */}
           <div 

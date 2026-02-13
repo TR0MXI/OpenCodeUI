@@ -56,7 +56,7 @@ export const ToolPartView = memo(function ToolPartView({ part, isFirst = false, 
             ${state.status === 'completed' ? 'text-text-400 group-hover:text-text-300' : ''}
           `}>
             {isActive && (
-              <span className="absolute inset-[-4px] rounded-full bg-accent-main-100/20 animate-ping" style={{ animationDuration: '1.5s' }} />
+              <span className="absolute inset-0 rounded-full bg-accent-main-100/20 animate-ping" style={{ animationDuration: '1.5s' }} />
             )}
             {getToolIcon(toolName)}
           </div>
