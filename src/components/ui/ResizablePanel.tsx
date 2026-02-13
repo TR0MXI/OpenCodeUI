@@ -207,11 +207,11 @@ export const ResizablePanel = memo(function ResizablePanel({
       : (isOpen ? 'translate-y-0' : 'translate-y-full')
       
     const mobileBaseClass = position === 'right'
-      ? 'fixed inset-0 z-[100] w-full shadow-2xl'
+      ? 'fixed inset-0 z-[100] w-full shadow-2xl pt-[var(--safe-area-inset-top)]'
       : 'fixed bottom-0 left-0 right-0 z-[100] h-[40vh] shadow-2xl rounded-t-xl border-t border-border-200'
 
     const mobileInsetStyle = position === 'right'
-      ? { top: 'var(--safe-area-inset-top)', height: 'calc(100% - var(--safe-area-inset-top))' }
+      ? undefined
       : undefined
 
     return (

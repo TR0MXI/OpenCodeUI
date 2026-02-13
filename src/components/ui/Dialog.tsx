@@ -189,7 +189,7 @@ export function Dialog({
         )}
         
         {/* Content */}
-        <div className="p-5 overflow-y-auto custom-scrollbar max-h-[80vh]">
+        <div className="p-5 overflow-y-auto custom-scrollbar max-h-[80vh] keyboard-inset-padding">
           {children}
         </div>
       </div>

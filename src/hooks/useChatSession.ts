@@ -31,9 +31,10 @@ const handleError = createErrorHandler('session')
 interface UseChatSessionOptions {
   chatAreaRef: React.RefObject<ChatAreaHandle | null>
   currentModel: ModelInfo | undefined
+  refetchModels: () => Promise<void>
 }
 
-export function useChatSession({ chatAreaRef, currentModel }: UseChatSessionOptions) {
+export function useChatSession({ chatAreaRef, currentModel, refetchModels }: UseChatSessionOptions) {
   // Store State
   const {
     messages,
@@ -180,6 +181,7 @@ export function useChatSession({ chatAreaRef, currentModel }: UseChatSessionOpti
       if (routeSessionId) {
         loadSession(routeSessionId)
       }
+      refetchModels().catch(() => {})
     },
   })
 

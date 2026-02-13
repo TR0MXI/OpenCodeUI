@@ -629,21 +629,11 @@ function ServersSettings() {
     navigateHome()
   }, [activeServer?.id, routeSessionId, setActiveServer, navigateHome])
 
-  // 手动重连 SSE（不切换服务器）
-  const handleReconnect = useCallback(() => {
-    reconnectSSE()
-  }, [])
-
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <SectionLabel>Connections</SectionLabel>
         <div className="flex items-center gap-2">
-          <button onClick={handleReconnect}
-            className="flex items-center gap-1 text-[11px] text-text-300 hover:text-text-100"
-            title="Force reconnect SSE">
-            <WifiIcon size={10} /> Reconnect
-          </button>
           {!addingServer && (
             <button onClick={() => setAddingServer(true)}
               className="flex items-center gap-1 text-[11px] text-accent-main-100 hover:text-accent-main-200">
@@ -655,7 +645,7 @@ function ServersSettings() {
       <div className="space-y-1.5">
         {servers.map(s => (
           <ServerItem key={s.id} server={s} health={getHealth(s.id)} isActive={activeServer?.id === s.id}
-            onSelect={() => handleSelectServer(s.id)} onDelete={() => removeServer(s.id)} onCheckHealth={() => checkHealth(s.id)} />
+            onSelect={() => handleSelectServer(s.id)} onDelete={() => removeServer(s.id)} onCheckHealth={() => { checkHealth(s.id); reconnectSSE() }} />
         ))}
         {addingServer && (
           <AddServerForm
@@ -663,7 +653,8 @@ function ServersSettings() {
               const auth = pass ? { username: user || 'opencode', password: pass } : undefined
               const s = addServer({ name: n, url: u, auth })
               setAddingServer(false)
-              checkHealth(s.id) 
+              checkHealth(s.id)
+              reconnectSSE()
             }}
             onCancel={() => setAddingServer(false)}
           />

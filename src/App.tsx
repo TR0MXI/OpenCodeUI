@@ -42,7 +42,7 @@ function App() {
   // ============================================
   // Models
   // ============================================
-  const { models, isLoading: modelsLoading } = useModels()
+  const { models, isLoading: modelsLoading, refetch: refetchModels } = useModels()
   const {
     selectedModelKey,
     selectedVariant,
@@ -209,7 +209,7 @@ function App() {
     handleNextSession,
     handleToggleAgent,
     handleCopyLastResponse,
-  } = useChatSession({ chatAreaRef, currentModel })
+  } = useChatSession({ chatAreaRef, currentModel, refetchModels })
 
 
   // ============================================
