@@ -104,7 +104,7 @@ export const InputFooter = memo(function InputFooter({
           onClick={onNewChat}
           className="hover:text-text-300 transition-colors"
         >
-          AI can make mistakes. Please double-check responses.
+          Please verify AI responses.
         </button>
       ) : (
         <>
