@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.1.7] - 2026-03-08
+
+- fix: truncate tool description overflow in tool call row (3782c67)
+- fix: tighten mobile model menu and attachment width (60b34a2)
+- fix: preserve utf-8 across tauri stream chunks (1dcb15a)
+
 ## [v0.1.6] - 2026-03-07
 
 - fix: restore tauri mobile file attachments (ffe3398)
