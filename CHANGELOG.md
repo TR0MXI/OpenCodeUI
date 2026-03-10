@@ -2,6 +2,8 @@
 
 ## [v0.1.15] - 2026-03-10
 
+- fix: default revertSteps to 0 in FloatingActions (400fbb4)
+- chore: bump version to 0.1.15 (3f57df2)
 - fix: slow scroll during streaming causes jitter by pulling user back to bottom (860683e)
 - fix: isFocused stuck after toolbar button click prevents capsule collapse (aaaa727)
 - refactor: extract FloatingActions and CollapsedCapsule components from InputBox (273bd98)
