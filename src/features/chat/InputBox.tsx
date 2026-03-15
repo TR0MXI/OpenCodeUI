@@ -886,10 +886,18 @@ function InputBoxComponent({
           className={`relative flex flex-col gap-2 ${isCollapsed ? 'justify-end' : ''}`}
           style={isCollapsed && expandedHeight > 0 ? { minHeight: expandedHeight } : undefined}
         >
-          {/* FloatingActions — absolute 定位在内容区上方，不占文档流，
-              避免显隐变化影响 InputBox 高度导致滚动位置抖动 */}
-          <div className="absolute bottom-full left-0 right-0 flex justify-center pb-2 pointer-events-none">
-            <div className="pointer-events-auto">
+          {/* FloatingActions — 
+              展开态：absolute 定位在内容区上方，不占文档流，避免显隐变化影响高度导致滚动抖动
+              收起态：正常文档流，紧贴胶囊上方
+              始终同一 DOM 节点，切换时 FloatingActions 不 remount，避免入场动画闪烁 */}
+          <div
+            className={
+              isCollapsed
+                ? 'flex justify-center pb-2'
+                : 'absolute bottom-full left-0 right-0 flex justify-center pb-2 pointer-events-none'
+            }
+          >
+            <div className={isCollapsed ? undefined : 'pointer-events-auto'}>
               <FloatingActions
                 showScrollToBottom={showScrollToBottom}
                 isCollapsed={isCollapsed}
