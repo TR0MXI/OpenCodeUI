@@ -53,7 +53,7 @@ struct Config {
 impl Config {
     fn new() -> Self {
         Self {
-            router_host: env::var("ROUTER_HOST").unwrap_or("127.0.0.1".to_string()),
+            router_host: env::var("ROUTER_HOST").unwrap_or("0.0.0.0".to_string()),
             router_host_v6: env::var("ROUTER_HOST_V6").unwrap_or("::1".to_string()),
             router_port: env::var("ROUTER_PORT")
                 .ok()

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use netlink_packet_core::{
     NLM_F_DUMP, NLM_F_REQUEST, NetlinkHeader, NetlinkMessage, NetlinkPayload,
@@ -10,19 +10,19 @@ use netlink_packet_sock_diag::{SockDiagMessage, constants::*};
 use netlink_sys::{
     AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket, protocols::NETLINK_SOCK_DIAG,
 };
-use parking_lot::Mutex;
+use tokio::sync::Mutex;
 
 pub type Ports = BTreeSet<u16>;
 pub type PortScanResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
-static SCANNER: LazyLock<Mutex<PortScanner>> = LazyLock::new(|| {
-    Mutex::new(
-        PortScanner::new().unwrap_or_else(|err| panic!("failed to initialize PortScanner: {err}")),
-    )
+static SCANNER: LazyLock<Arc<Mutex<PortScanner>>> = LazyLock::new(|| {
+    Arc::new(Mutex::new(PortScanner::new().unwrap_or_else(|err| {
+        panic!("failed to initialize PortScanner: {err}")
+    })))
 });
 
 pub async fn scan_ports() -> PortScanResult<PortSnapshot> {
-    SCANNER.lock().snapshot().await
+    SCANNER.clone().lock_owned().await.snapshot().await
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
