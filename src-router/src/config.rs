@@ -1,127 +1,86 @@
-use std::{collections::HashSet, env};
+use std::{env, sync::LazyLock, time::Duration};
 
-pub(crate) const ROUTES_FILE: &str = "/etc/caddy/routes.conf";
-pub(crate) const PREVIEW_FILE: &str = "/etc/caddy/preview.conf";
+static CONFIG: LazyLock<Config> = LazyLock::new(Config::new);
 
-#[derive(Clone, Debug)]
-pub struct Config {
-    target_container: String,
+pub fn router_host_v6() -> &'static str {
+    &CONFIG.router_host_v6
+}
+
+pub fn router_host() -> &'static str {
+    &CONFIG.router_host
+}
+
+pub fn router_port() -> u16 {
+    CONFIG.router_port
+}
+
+pub fn router_state_file() -> &'static str {
+    &CONFIG.router_state_file
+}
+
+pub fn router_username() -> &'static str {
+    &CONFIG.router_username
+}
+
+pub fn router_password() -> &'static str {
+    &CONFIG.router_password
+}
+
+pub fn scan_interval() -> Duration {
+    CONFIG.scan_interval
+}
+
+pub fn token_length() -> usize {
+    CONFIG.token_length
+}
+
+pub fn port_range() -> (u16, u16) {
+    CONFIG.port_range
+}
+
+struct Config {
+    router_host: String,
+    router_host_v6: String,
     router_state_file: String,
-    public_base_url: String,
-    preview_domain: String,
     router_username: String,
     router_password: String,
-    scan_interval: u64,
+    scan_interval: Duration,
     token_length: usize,
     port_range: (u16, u16),
-    exclude_ports: HashSet<u16>,
+    router_port: u16,
 }
 
 impl Config {
-    pub fn from_env() -> Self {
+    fn new() -> Self {
         Self {
-            target_container: env::var("TARGET_CONTAINER")
-                .unwrap_or_else(|_| "opencode-backend".to_string()),
-            router_state_file: env::var("ROUTER_STATE_FILE")
-                .unwrap_or_else(|_| "/data/routes.json".to_string()),
-            public_base_url: env::var("PUBLIC_BASE_URL")
-                .map(|value| value.trim_end_matches('/').to_string())
-                .unwrap_or_default(),
-            preview_domain: env::var("PREVIEW_DOMAIN")
-                .map(|value| value.trim().to_string())
-                .unwrap_or_default(),
-            router_username: env::var("ROUTER_USERNAME").unwrap_or_default(),
-            router_password: env::var("ROUTER_PASSWORD").unwrap_or_default(),
-            scan_interval: parse_u64_env("ROUTER_SCAN_INTERVAL", 5),
-            token_length: parse_usize_env("ROUTER_TOKEN_LENGTH", 12),
-            port_range: parse_port_range(
-                env::var("ROUTER_PORT_RANGE")
-                    .ok()
-                    .as_deref()
-                    .unwrap_or("3000-9999"),
-            ),
-            exclude_ports: parse_exclude_ports(
-                env::var("ROUTER_EXCLUDE_PORTS")
-                    .ok()
-                    .as_deref()
-                    .unwrap_or("4096"),
-            ),
+            router_host: env::var("ROUTER_HOST").unwrap_or("127.0.0.1".to_string()),
+            router_host_v6: env::var("ROUTER_HOST_V6").unwrap_or("::1".to_string()),
+            router_port: env::var("ROUTER_PORT")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(7070),
+            router_state_file: env::var("ROUTER_STATE_FILE").unwrap_or("./routes.json".to_string()),
+            router_username: env::var("ROUTER_USERNAME").unwrap_or("".to_string()),
+            router_password: env::var("ROUTER_PASSWORD").unwrap_or("".to_string()),
+            scan_interval: env::var("SCAN_INTERVAL")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .map(Duration::from_secs)
+                .unwrap_or(Duration::from_secs(5)),
+            token_length: env::var("TOKEN_LENGTH")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(12),
+            port_range: env::var("PORT_RANGE")
+                .ok()
+                .and_then(|rg_str| {
+                    rg_str.split_once('-').and_then(|(start, end)| {
+                        let start = start.trim().parse().ok()?;
+                        let end = end.trim().parse().ok()?;
+                        Some((start, end))
+                    })
+                })
+                .unwrap_or((3000, 9999)),
         }
     }
-
-    pub fn target_container(&self) -> &str {
-        &self.target_container
-    }
-
-    pub fn router_state_file(&self) -> &str {
-        &self.router_state_file
-    }
-
-    pub fn public_base_url(&self) -> &str {
-        &self.public_base_url
-    }
-
-    pub fn preview_domain(&self) -> &str {
-        &self.preview_domain
-    }
-
-    pub fn router_username(&self) -> &str {
-        &self.router_username
-    }
-
-    pub fn router_password(&self) -> &str {
-        &self.router_password
-    }
-
-    pub fn scan_interval(&self) -> u64 {
-        self.scan_interval
-    }
-
-    pub fn token_length(&self) -> usize {
-        self.token_length
-    }
-
-    pub fn port_range(&self) -> (u16, u16) {
-        self.port_range
-    }
-
-    pub fn exclude_ports(&self) -> &HashSet<u16> {
-        &self.exclude_ports
-    }
-}
-
-fn parse_u64_env(name: &str, default: u64) -> u64 {
-    env::var(name)
-        .ok()
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(default)
-}
-
-fn parse_usize_env(name: &str, default: usize) -> usize {
-    env::var(name)
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(default)
-}
-
-fn parse_port_range(value: &str) -> (u16, u16) {
-    let Some((start, end)) = value.split_once('-') else {
-        return (3000, 9999);
-    };
-
-    let mut start = start.trim().parse::<u16>().unwrap_or(3000);
-    let mut end = end.trim().parse::<u16>().unwrap_or(9999);
-
-    if start > end {
-        std::mem::swap(&mut start, &mut end);
-    }
-
-    (start, end)
-}
-
-fn parse_exclude_ports(value: &str) -> HashSet<u16> {
-    value
-        .split(',')
-        .filter_map(|item| item.trim().parse::<u16>().ok())
-        .collect()
 }
